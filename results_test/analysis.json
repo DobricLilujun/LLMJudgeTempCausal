@@ -1,0 +1,162 @@
+{
+  "by_temperature": [
+    {
+      "temperature": 0.0,
+      "agreement_s1": 0.4,
+      "agreement_s2": 0.0,
+      "error_rate_pairwise": 0.0,
+      "position_p_first": 0.8888888888888888,
+      "position_p_second": 0.1111111111111111,
+      "position_bias": 0.7777777777777777,
+      "position_abs_bias": 0.38888888888888884,
+      "single_answer_score_a_mean": 7.8,
+      "single_answer_score_a_std": 1.2814465510343749,
+      "single_answer_score_b_mean": 7.1,
+      "single_answer_score_b_std": 2.7701415506299165,
+      "error_rate_single_answer": 0.0,
+      "single_answer_kendall_tau": 0.1421338109037403,
+      "single_answer_spearman_rho": 0.15058465048420852,
+      "n_samples": 60
+    },
+    {
+      "temperature": 0.5,
+      "agreement_s1": 0.4,
+      "agreement_s2": 0.0,
+      "error_rate_pairwise": 0.0,
+      "position_p_first": 0.9444444444444444,
+      "position_p_second": 0.05555555555555555,
+      "position_bias": 0.8888888888888888,
+      "position_abs_bias": 0.4444444444444444,
+      "single_answer_score_a_mean": 7.9,
+      "single_answer_score_a_std": 1.1652874052533588,
+      "single_answer_score_b_mean": 7.1,
+      "single_answer_score_b_std": 2.7701415506299165,
+      "error_rate_single_answer": 0.0,
+      "single_answer_kendall_tau": 0.10350983390135314,
+      "single_answer_spearman_rho": 0.1118033988749895,
+      "n_samples": 60
+    },
+    {
+      "temperature": 1.0,
+      "agreement_s1": 0.4,
+      "agreement_s2": 0.0,
+      "error_rate_pairwise": 0.0,
+      "position_p_first": 0.8888888888888888,
+      "position_p_second": 0.1111111111111111,
+      "position_bias": 0.7777777777777777,
+      "position_abs_bias": 0.38888888888888884,
+      "single_answer_score_a_mean": 7.85,
+      "single_answer_score_a_std": 1.3088765773505315,
+      "single_answer_score_b_mean": 7.05,
+      "single_answer_score_b_std": 2.762054917705485,
+      "error_rate_single_answer": 0.0,
+      "single_answer_kendall_tau": 0.08986064433619868,
+      "single_answer_spearman_rho": 0.09496714704969829,
+      "n_samples": 60
+    }
+  ],
+  "simple_ate": {
+    "ate_simple": 0.0,
+    "means_by_temp": {
+      "0.0": 0.1,
+      "0.5": 0.1,
+      "1.0": 0.1
+    },
+    "stds_by_temp": {
+      "0.0": 0.30779350562554625,
+      "0.5": 0.30779350562554625,
+      "1.0": 0.30779350562554625
+    },
+    "counts_by_temp": {
+      "0.0": 20,
+      "0.5": 20,
+      "1.0": 20
+    },
+    "anova_f": 3.794795297829665e-33,
+    "anova_p": 1.0,
+    "spearman_rho": 0.0,
+    "spearman_p": 1.0
+  },
+  "dml_ate": {
+    "ate": -0.060972163295394864,
+    "ate_ci_lower": -0.25255308865181714,
+    "ate_ci_upper": 0.13060876206102737,
+    "cate_at_mean": -0.06097216329539487,
+    "n_samples": 60
+  },
+  "stratified_by_prompt": {
+    "baseline": {
+      "ate_simple": 0.0,
+      "means_by_temp": {
+        "0.0": 0.2,
+        "0.5": 0.2,
+        "1.0": 0.2
+      },
+      "stds_by_temp": {
+        "0.0": 0.42163702135578396,
+        "0.5": 0.42163702135578396,
+        "1.0": 0.42163702135578396
+      },
+      "counts_by_temp": {
+        "0.0": 10,
+        "0.5": 10,
+        "1.0": 10
+      },
+      "anova_f": 1.0111132208032987e-32,
+      "anova_p": 1.0,
+      "spearman_rho": 0.0,
+      "spearman_p": 1.0
+    },
+    "cot": {
+      "ate_simple": 0.0,
+      "means_by_temp": {
+        "0.0": 0.0,
+        "0.5": 0.0,
+        "1.0": 0.0
+      },
+      "stds_by_temp": {
+        "0.0": 0.0,
+        "0.5": 0.0,
+        "1.0": 0.0
+      },
+      "counts_by_temp": {
+        "0.0": 10,
+        "0.5": 10,
+        "1.0": 10
+      },
+      "anova_f": NaN,
+      "anova_p": NaN,
+      "spearman_rho": NaN,
+      "spearman_p": NaN
+    }
+  },
+  "stratified_by_model": {
+    "1B": {
+      "ate_simple": 0.0,
+      "means_by_temp": {
+        "0.0": 0.1,
+        "0.5": 0.1,
+        "1.0": 0.1
+      },
+      "stds_by_temp": {
+        "0.0": 0.30779350562554625,
+        "0.5": 0.30779350562554625,
+        "1.0": 0.30779350562554625
+      },
+      "counts_by_temp": {
+        "0.0": 20,
+        "0.5": 20,
+        "1.0": 20
+      },
+      "anova_f": 3.794795297829665e-33,
+      "anova_p": 1.0,
+      "spearman_rho": 0.0,
+      "spearman_p": 1.0
+    }
+  },
+  "consistency_by_temperature": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+  }
+}

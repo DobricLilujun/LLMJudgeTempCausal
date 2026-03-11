@@ -1,0 +1,12 @@
+datasets>=3.0
+openai>=1.0
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+scikit-learn>=1.3
+econml>=0.15
+pgmpy>=0.1.25
+matplotlib>=3.8
+seaborn>=0.13
+tqdm>=4.66
+click>=8.1
