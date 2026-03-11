@@ -1,0 +1,20 @@
+[User Question (Turn 1)]
+{{ question }}
+[Assistant A (Turn 1)]
+{{ response_a_turn1 }}
+[Assistant B (Turn 1)]
+{{ response_b_turn1 }}
+{% if follow_up_question %}
+[User Follow-up (Turn 2)]
+{{ follow_up_question }}
+[Assistant A (Turn 2)]
+{{ response_a }}
+[Assistant B (Turn 2)]
+{{ response_b }}
+{% else %}
+[Assistant A]
+{{ response_a }}
+[Assistant B]
+{{ response_b }}
+{% endif %}
+Considering the full conversation, which assistant is better? Output [[A]], [[B]], or [[C]] for tie.

@@ -1,0 +1,16 @@
+[User Question]
+{{ question }}
+
+[The Start of Assistant A's Answer]
+{{ response_a }}
+[The End of Assistant A's Answer]
+
+[The Start of Assistant B's Answer]
+{{ response_b }}
+[The End of Assistant B's Answer]
+
+Which assistant's answer is better? Output [[A]], [[B]], or [[C]] for tie.
+{%- if reference_hint %}
+
+Note: Consider factual accuracy carefully. A response that is more factually accurate should be preferred.
+{%- endif %}
