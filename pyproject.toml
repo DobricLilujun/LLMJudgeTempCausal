@@ -18,6 +18,8 @@ dependencies = [
     "seaborn>=0.13",
     "tqdm>=4.66",
     "click>=8.1",
+    "vllm>=0.17.1",
+    "dowhy>=0.14",
 ]
 
 [project.scripts]

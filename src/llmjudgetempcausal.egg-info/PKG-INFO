@@ -17,6 +17,8 @@ Requires-Dist: matplotlib>=3.8
 Requires-Dist: seaborn>=0.13
 Requires-Dist: tqdm>=4.66
 Requires-Dist: click>=8.1
+Requires-Dist: vllm>=0.17.1
+Requires-Dist: dowhy>=0.14
 
 # LLMJudgeTempCausal
 
