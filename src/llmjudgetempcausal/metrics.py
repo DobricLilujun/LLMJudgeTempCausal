@@ -172,12 +172,21 @@ def compute_all_metrics(
         bias = compute_position_bias(pw)
         metrics.update({f"position_{k}": v for k, v in bias.items()})
 
+    # Reference-guided pairwise metrics
+    rg = results_df[results_df["judge_type"] == "reference_guided"]
+    if len(rg) > 0:
+        metrics["reference_guided_agreement_s1"] = compute_agreement_s1(rg)
+        metrics["reference_guided_agreement_s2"] = compute_agreement_s2(rg)
+        metrics["error_rate_reference_guided"] = compute_error_rate(rg)
+        rg_bias = compute_position_bias(rg)
+        metrics.update({f"reference_guided_position_{k}": v for k, v in rg_bias.items()})
+
     # Consistency (requires paired original/swap data)
     if consistency_df_orig is not None and consistency_df_swap is not None:
         metrics["consistency"] = compute_consistency(consistency_df_orig, consistency_df_swap)
 
     # Scoring metrics
-    for jt in ("single_answer", "reference_guided"):
+    for jt in ("single_answer",):
         sc = results_df[results_df["judge_type"] == jt]
         if len(sc) > 0:
             score_stats = compute_score_stats(sc)

@@ -1,11 +1,16 @@
 [User Question]
 {{ question }}
 
-[Reference Answer]
-{{ reference }}
+[The Start of Reference Answer]
+{{ answer_ref }}
+[The End of Reference Answer]
 
-[The Start of Assistant's Answer]
-{{ response }}
-[The End of Assistant's Answer]
+[The Start of Assistant A's Answer]
+{{ response_a }}
+[The End of Assistant A's Answer]
 
-Compare the assistant's answer to the reference answer and rate it on a scale of 1 to 10. Output [[score]].
+[The Start of Assistant B's Answer]
+{{ response_b }}
+[The End of Assistant B's Answer]
+
+Respond with JSON only, using the required judge_result schema.

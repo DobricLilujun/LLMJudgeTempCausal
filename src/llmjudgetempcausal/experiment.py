@@ -47,6 +47,7 @@ def _result_to_dict(r: JudgeResult) -> dict:
         "model_size_label": r.model_size_label,
         "repeat_id": r.repeat_id,
         "raw_output": r.raw_output,
+        "judge_reason": r.judge_reason,
         "pairwise_winner": r.pairwise_winner,
         "score_a": r.score_a,
         "score_b": r.score_b,

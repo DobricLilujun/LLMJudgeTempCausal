@@ -22,6 +22,7 @@ src/llmjudgetempcausal/assets/few_shot_single.jinja
 src/llmjudgetempcausal/assets/system_pairwise.jinja
 src/llmjudgetempcausal/assets/system_pairwise_cot.jinja
 src/llmjudgetempcausal/assets/system_reference.jinja
+src/llmjudgetempcausal/assets/system_reference_cot.jinja
 src/llmjudgetempcausal/assets/system_single.jinja
 src/llmjudgetempcausal/assets/system_single_cot.jinja
 src/llmjudgetempcausal/assets/user_multi_turn.jinja

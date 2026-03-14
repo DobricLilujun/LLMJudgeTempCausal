@@ -8,8 +8,9 @@ from typing import Optional
 from openai import OpenAI
 
 from .config import ModelConfig, BackendType
+from .prompts import adapt_messages_for_model
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 
 def _messages_to_prompt(messages: list[dict[str, str]]) -> str:
@@ -53,28 +54,37 @@ class LLMClient:
         temperature: float = 0.0,
         top_p: float = 0.95,
         max_tokens: int = 1024,
+        seed: Optional[int] = None,
     ) -> str:
         """Generate a completion from the LLM.
 
         Tries chat completions first; falls back to text completions if needed.
+
+        Args:
+            seed: Random seed for reproducible sampling. Passed to the API when set.
+                  Supported by vLLM, SGLang, and OpenAI (>=gpt-4-turbo).
         """
+        request_messages = adapt_messages_for_model(messages, self.model_name)
+        extra = {"seed": seed} if seed is not None else {}
+
         if not self._use_completions:
             try:
                 response = self.client.chat.completions.create(
                     model=self.model_name,
-                    messages=messages,
+                    messages=request_messages,
                     temperature=temperature,
                     top_p=top_p,
                     max_tokens=max_tokens,
+                    **extra,
                 )
                 return response.choices[0].message.content or ""
             except Exception as e:
-                logger.warning("Chat completions failed, falling back to text completions: %s", e)
+                # logger.warning("Chat completions failed, falling back to text completions: %s", e)
                 self._use_completions = True
 
         # Fallback: use text completions API
         try:
-            prompt = _messages_to_prompt(messages)
+            prompt = _messages_to_prompt(request_messages)
             response = self.client.completions.create(
                 model=self.model_name,
                 prompt=prompt,
@@ -82,10 +92,11 @@ class LLMClient:
                 top_p=top_p,
                 max_tokens=max_tokens,
                 stop=["<end_of_turn>"],
+                **extra,
             )
             return response.choices[0].text or ""
         except Exception as e:
-            logger.error("LLM generation failed: %s", e)
+            # logger.error("LLM generation failed: %s", e)
             return f"ERROR: {e}"
 
     def generate_batch(
@@ -94,9 +105,10 @@ class LLMClient:
         temperature: float = 0.0,
         top_p: float = 0.95,
         max_tokens: int = 1024,
+        seed: Optional[int] = None,
     ) -> list[str]:
         """Generate completions for a batch of message lists (sequentially)."""
         results = []
         for messages in messages_list:
-            results.append(self.generate(messages, temperature, top_p, max_tokens))
+            results.append(self.generate(messages, temperature, top_p, max_tokens, seed=seed))
         return results

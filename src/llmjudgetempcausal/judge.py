@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass, field
@@ -29,6 +30,7 @@ class JudgeResult:
     model_size_label: str
     repeat_id: int
     raw_output: str
+    judge_reason: Optional[str] = None
     # Parsed results
     pairwise_winner: Optional[str] = None   # "A", "B", "C" (tie), or None (error)
     score_a: Optional[float] = None
@@ -37,12 +39,60 @@ class JudgeResult:
     parse_error: bool = False
 
 
+def _parse_json_object(raw: str) -> Optional[dict]:
+    """Best-effort extraction of a JSON object from raw model output."""
+    text = raw.strip()
+    if not text:
+        return None
+
+    candidates = [text]
+    fenced = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE | re.DOTALL).strip()
+    if fenced != text:
+        candidates.append(fenced)
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        candidates.append(text[start:end + 1])
+
+    for candidate in candidates:
+        try:
+            obj = json.loads(candidate)
+        except Exception:
+            continue
+        if isinstance(obj, dict):
+            return obj
+
+    return None
+
+
+def parse_judge_reason(raw: str) -> Optional[str]:
+    """Parse judge reason from JSON output, if present."""
+    obj = _parse_json_object(raw)
+    if not obj:
+        return None
+
+    reason = obj.get("judge_reason", obj.get("reason"))
+    if reason is None:
+        return None
+    reason = str(reason).strip()
+    return reason or None
+
+
 def parse_pairwise(raw: str) -> Optional[str]:
     """Parse pairwise verdict from raw LLM output.
 
-    Looks for [[A]], [[B]], or [[C]] patterns.
+    Looks for JSON {"judge_result": "A"} first, then legacy [[A]] fallback.
     Returns "A", "B", "C", or None if parse error.
     """
+    obj = _parse_json_object(raw)
+    if obj:
+        value = obj.get("judge_result", obj.get("winner", obj.get("verdict")))
+        if value is not None:
+            value = str(value).strip().upper()
+            if value in ("A", "B", "C"):
+                return value
+
     # Look for [[X]] pattern
     match = re.search(r'\[\[([ABCabc])\]\]', raw)
     if match:
@@ -61,8 +111,19 @@ def parse_pairwise(raw: str) -> Optional[str]:
 def parse_score(raw: str) -> Optional[float]:
     """Parse a numeric score from raw LLM output.
 
-    Looks for [[N]] where N is 1-10.
+    Looks for JSON {"judge_result": N} first, then legacy [[N]] fallback.
     """
+    obj = _parse_json_object(raw)
+    if obj:
+        value = obj.get("judge_result", obj.get("score", obj.get("rating")))
+        if value is not None:
+            try:
+                score = float(value)
+            except (TypeError, ValueError):
+                score = None
+            if score is not None and 1 <= score <= 10:
+                return score
+
     match = re.search(r'\[\[(\d+(?:\.\d+)?)\]\]', raw)
     if match:
         score = float(match.group(1))
@@ -87,19 +148,28 @@ def run_judge_single(
     max_tokens: int,
     repeat_id: int,
     model_size_label: str,
+    seed: Optional[int] = None,
 ) -> list[JudgeResult]:
     """Run a single judge evaluation for one pair.
 
     For pairwise: returns 1 result.
-    For single_answer/reference_guided: returns 2 results (one per response).
+    For reference_guided: returns 1 pairwise result.
+    For single_answer: returns 2 results (one per response).
     """
     results = []
 
-    if judge_type == JudgeType.PAIRWISE:
+    if judge_type in (JudgeType.PAIRWISE, JudgeType.REFERENCE_GUIDED):
         is_swapped = (prompt_variant == PromptVariant.POSITION_SWAP)
-        messages = build_messages(pair, judge_type, prompt_variant, swapped=is_swapped)
-        raw = client.generate(messages, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+        messages = build_messages(
+            pair,
+            judge_type,
+            prompt_variant,
+            swapped=is_swapped,
+            model_name=client.model_name,
+        )
+        raw = client.generate(messages, temperature=temperature, top_p=top_p, max_tokens=max_tokens, seed=seed)
         winner = parse_pairwise(raw)
+        judge_reason = parse_judge_reason(raw)
         # If swapped, flip the winner back
         if is_swapped and winner in ("A", "B"):
             winner = "B" if winner == "A" else "A"
@@ -116,16 +186,24 @@ def run_judge_single(
             model_size_label=model_size_label,
             repeat_id=repeat_id,
             raw_output=raw,
+            judge_reason=judge_reason,
             pairwise_winner=winner,
             is_swapped=is_swapped,
-            parse_error=(winner is None),
+            parse_error=((winner is None) or (prompt_variant == PromptVariant.COT and judge_reason is None)),
         ))
 
-    elif judge_type in (JudgeType.SINGLE_ANSWER, JudgeType.REFERENCE_GUIDED):
+    elif judge_type == JudgeType.SINGLE_ANSWER:
         for which in ("a", "b"):
-            messages = build_messages(pair, judge_type, prompt_variant, which_response=which)
-            raw = client.generate(messages, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+            messages = build_messages(
+                pair,
+                judge_type,
+                prompt_variant,
+                which_response=which,
+                model_name=client.model_name,
+            )
+            raw = client.generate(messages, temperature=temperature, top_p=top_p, max_tokens=max_tokens, seed=seed)
             score = parse_score(raw)
+            judge_reason = parse_judge_reason(raw)
             result = JudgeResult(
                 question_id=pair.question_id,
                 model_a=pair.model_a,
@@ -138,7 +216,8 @@ def run_judge_single(
                 model_size_label=model_size_label,
                 repeat_id=repeat_id,
                 raw_output=raw,
-                parse_error=(score is None),
+                judge_reason=judge_reason,
+                parse_error=((score is None) or (prompt_variant == PromptVariant.COT and judge_reason is None)),
             )
             if which == "a":
                 result.score_a = score
@@ -158,16 +237,29 @@ def run_judge_pair_consistency(
     max_tokens: int,
     repeat_id: int,
     model_size_label: str,
+    seed: Optional[int] = None,
 ) -> tuple[JudgeResult, JudgeResult]:
     """Run pairwise judge in both original and swapped order for consistency check."""
     # Original order
-    messages_orig = build_messages(pair, JudgeType.PAIRWISE, PromptVariant.BASELINE, swapped=False)
-    raw_orig = client.generate(messages_orig, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+    messages_orig = build_messages(
+        pair,
+        JudgeType.PAIRWISE,
+        PromptVariant.BASELINE,
+        swapped=False,
+        model_name=client.model_name,
+    )
+    raw_orig = client.generate(messages_orig, temperature=temperature, top_p=top_p, max_tokens=max_tokens, seed=seed)
     winner_orig = parse_pairwise(raw_orig)
 
     # Swapped order
-    messages_swap = build_messages(pair, JudgeType.PAIRWISE, PromptVariant.BASELINE, swapped=True)
-    raw_swap = client.generate(messages_swap, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+    messages_swap = build_messages(
+        pair,
+        JudgeType.PAIRWISE,
+        PromptVariant.BASELINE,
+        swapped=True,
+        model_name=client.model_name,
+    )
+    raw_swap = client.generate(messages_swap, temperature=temperature, top_p=top_p, max_tokens=max_tokens, seed=seed)
     winner_swap = parse_pairwise(raw_swap)
     # Flip back
     if winner_swap in ("A", "B"):

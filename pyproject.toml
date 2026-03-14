@@ -20,6 +20,8 @@ dependencies = [
     "click>=8.1",
     "vllm>=0.17.1",
     "dowhy>=0.14",
+    "ipywidgets>=8.1.8",
+    "jupyter>=1.1.1",
 ]
 
 [project.scripts]
