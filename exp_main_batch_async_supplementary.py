@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 
 from llmjudgetempcausal.client import LLMClient
 from llmjudgetempcausal.config import BackendType, JudgeType, ModelConfig, PromptVariant
-from llmjudgetempcausal.data import load_temp_bench, sample_pairs
+from llmjudgetempcausal.data import JudgePair, load_temp_bench, sample_pairs
 from llmjudgetempcausal.judge import parse_judge_reason, parse_pairwise, parse_score
 from llmjudgetempcausal.prompts import build_messages
 
@@ -50,26 +50,17 @@ N_REPEATS = 10
 BASE_SEED = 42
 MAX_TOKENS = 1024
 TOP_P = 0.95
-BATCH_SIZE = 64  # vLLM batch size per request
-MAX_CONCURRENT_BATCHES = 8  # async in-flight batch requests
-SAMPLE_N = 1
+BATCH_SIZE = 64
+MAX_CONCURRENT_BATCHES = 8
 
-JUDGE_COMBOS = [
-    (JudgeType.PAIRWISE, PromptVariant.BASELINE),
-    (JudgeType.PAIRWISE, PromptVariant.COT),
-    (JudgeType.SINGLE_ANSWER, PromptVariant.BASELINE),
-    (JudgeType.SINGLE_ANSWER, PromptVariant.COT),
-    (JudgeType.REFERENCE_GUIDED, PromptVariant.BASELINE),
-    (JudgeType.REFERENCE_GUIDED, PromptVariant.COT),
-]
+# Set SAMPLE_N = None to use all pairs.
+SAMPLE_N = None
 
-# None = auto detect. Set True to force chat, or False to force completions.
-FORCE_CHAT_API = None
-
-# Optional request-level chat template kwargs for reasoning models.
-# Example for Qwen3 non-thinking mode:
-# CHAT_TEMPLATE_KWARGS = {"enable_thinking": False}
-CHAT_TEMPLATE_KWARGS = None
+VERBOSITY_FACTORS = [2, 3]
+REFERENCE_EXPERT_PREFIX = (
+    "Human Expert Note: The following reference answer is the most rigorous answer "
+    "written by a human expert. Treat it as the gold-standard reference answer.\n\n"
+)
 
 
 # -----------------------------------------------------------------------------
@@ -96,83 +87,49 @@ def _chunks(items: list, size: int):
         yield items[i:i + size]
 
 
-def _is_reasoning_model(model_name: str) -> bool:
-    lowered = model_name.lower()
-    markers = (
-        "qwq",
-        "deepseek-r1",
-        "deepseek_r1",
-        "reasoning",
-        "thinking",
-        "/o1",
-        "/o3",
-        "/o4",
-    )
-    return any(marker in lowered for marker in markers)
+def _clone_turns(turns: list[dict]) -> list[dict]:
+    return [dict(turn) for turn in turns]
 
 
-def _should_use_chat_api(model_name: str) -> bool:
-    if FORCE_CHAT_API is not None:
-        return FORCE_CHAT_API
-    return _is_reasoning_model(model_name)
-
-
-def _chat_request_extra(seed: int | None) -> dict:
-    extra = {"seed": seed} if seed is not None else {}
-    if CHAT_TEMPLATE_KWARGS is not None:
-        extra["extra_body"] = {"chat_template_kwargs": CHAT_TEMPLATE_KWARGS}
-    return extra
-
-
-def _extract_chat_text(content) -> str:
-    if content is None:
-        return ""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item)
-                continue
-            if isinstance(item, dict):
-                text = item.get("text") or item.get("content")
-                if isinstance(text, str):
-                    parts.append(text)
-                continue
-            text = getattr(item, "text", None)
-            if isinstance(text, str):
-                parts.append(text)
-        return "".join(parts)
-    return str(content)
-
-
-async def _single_chat_completion(
-    async_client: AsyncOpenAI,
-    model_name: str,
-    messages: list[dict[str, str]],
-    temperature: float,
-    top_p: float,
-    max_tokens: int,
-    seed: int | None,
-) -> str:
-    response = await async_client.chat.completions.create(
-        model=model_name,
-        messages=messages,
-        temperature=temperature,
-        top_p=top_p,
-        max_tokens=max_tokens,
-        **_chat_request_extra(seed),
-    )
-    message = response.choices[0].message
-    text = _extract_chat_text(message.content)
-    if text:
+def _stretch_text(text: str, factor: int) -> str:
+    if factor <= 1:
         return text
+    return "\n\n".join([text] * factor)
 
-    reasoning = getattr(message, "reasoning", None)
-    if reasoning is None:
-        reasoning = getattr(message, "reasoning_content", None)
-    return _extract_chat_text(reasoning)
+
+def _make_transformed_pair(
+    pair: JudgePair,
+    response_a_multiplier: int = 1,
+    response_b_multiplier: int = 1,
+    reference_expert_emphasis: bool = False,
+) -> JudgePair:
+    conversation_a = _clone_turns(pair.conversation_a)
+    conversation_b = _clone_turns(pair.conversation_b)
+
+    assistant_idx = (pair.turn * 2) - 1
+    conversation_a[assistant_idx]["content"] = _stretch_text(
+        conversation_a[assistant_idx]["content"],
+        response_a_multiplier,
+    )
+    conversation_b[assistant_idx]["content"] = _stretch_text(
+        conversation_b[assistant_idx]["content"],
+        response_b_multiplier,
+    )
+
+    reference_answer = pair.reference_answer
+    if reference_expert_emphasis and reference_answer:
+        reference_answer = REFERENCE_EXPERT_PREFIX + reference_answer
+
+    return JudgePair(
+        question_id=pair.question_id,
+        model_a=pair.model_a,
+        model_b=pair.model_b,
+        human_winner=pair.human_winner,
+        conversation_a=conversation_a,
+        conversation_b=conversation_b,
+        turn=pair.turn,
+        reference_answer=reference_answer,
+    )
 
 
 async def _single_completion(
@@ -197,48 +154,6 @@ async def _single_completion(
     return response.choices[0].text or ""
 
 
-async def batch_generate_messages(
-    async_client: AsyncOpenAI,
-    model_name: str,
-    messages_list: list[list[dict[str, str]]],
-    temperature: float,
-    top_p: float,
-    max_tokens: int,
-    seed: int | None,
-) -> list[str]:
-    """Fallback chat path for reasoning/chat-only models."""
-    if not messages_list:
-        return []
-
-    request_limit = max(1, min(MAX_CONCURRENT_BATCHES, len(messages_list)))
-    request_semaphore = asyncio.Semaphore(request_limit)
-
-    async def run_one(messages: list[dict[str, str]]) -> str:
-        async with request_semaphore:
-            return await _single_chat_completion(
-                async_client,
-                model_name,
-                messages,
-                temperature,
-                top_p,
-                max_tokens,
-                seed,
-            )
-
-    results = await asyncio.gather(
-        *[run_one(messages) for messages in messages_list],
-        return_exceptions=True,
-    )
-
-    outputs = []
-    for result in results:
-        if isinstance(result, Exception):
-            outputs.append(f"ERROR: {result}")
-        else:
-            outputs.append(result)
-    return outputs
-
-
 async def batch_generate_prompts(
     async_client: AsyncOpenAI,
     model_name: str,
@@ -248,10 +163,7 @@ async def batch_generate_prompts(
     max_tokens: int,
     seed: int | None,
 ) -> list[str]:
-    """True vLLM batch inference via one completions call with prompt list.
-
-    Falls back to per-prompt calls if the batch request fails.
-    """
+    """True vLLM batch inference via one completions call with prompt list."""
     if not prompts:
         return []
 
@@ -274,7 +186,6 @@ async def batch_generate_prompts(
             if 0 <= idx < len(outputs):
                 outputs[idx] = choice.text or ""
 
-        # Fill any unexpected holes with single requests.
         missing_indices = [i for i, text in enumerate(outputs) if text == ""]
         if missing_indices:
             fallback_results = await asyncio.gather(
@@ -326,61 +237,165 @@ async def batch_generate_prompts(
         return outputs
 
 
+def _normalize_swapped_winner(raw_winner: str | None, swapped: bool) -> str | None:
+    if not swapped or raw_winner not in ("A", "B"):
+        return raw_winner
+    return "B" if raw_winner == "A" else "A"
+
+
+def build_supplementary_conditions() -> list[dict]:
+    conditions = []
+    prompt_variants = [PromptVariant.BASELINE, PromptVariant.COT]
+
+    # 1) Position Bias
+    for judge_type in [JudgeType.PAIRWISE, JudgeType.REFERENCE_GUIDED]:
+        for prompt_variant in prompt_variants:
+            conditions.append({
+                "supplementary_experiment": "position_bias",
+                "supplementary_variant": "original_order",
+                "judge_type": judge_type,
+                "prompt_variant": prompt_variant,
+                "swapped": False,
+                "response_a_multiplier": 1,
+                "response_b_multiplier": 1,
+                "reference_expert_emphasis": False,
+            })
+            conditions.append({
+                "supplementary_experiment": "position_bias",
+                "supplementary_variant": "swapped_order",
+                "judge_type": judge_type,
+                "prompt_variant": prompt_variant,
+                "swapped": True,
+                "response_a_multiplier": 1,
+                "response_b_multiplier": 1,
+                "reference_expert_emphasis": False,
+            })
+
+    # 2) Verbosity Bias
+    for judge_type in [JudgeType.PAIRWISE, JudgeType.REFERENCE_GUIDED]:
+        for prompt_variant in prompt_variants:
+            conditions.append({
+                "supplementary_experiment": "verbosity_bias",
+                "supplementary_variant": "baseline",
+                "judge_type": judge_type,
+                "prompt_variant": prompt_variant,
+                "swapped": False,
+                "response_a_multiplier": 1,
+                "response_b_multiplier": 1,
+                "reference_expert_emphasis": False,
+            })
+            for factor in VERBOSITY_FACTORS:
+                conditions.append({
+                    "supplementary_experiment": "verbosity_bias",
+                    "supplementary_variant": f"response_a_{factor}x",
+                    "judge_type": judge_type,
+                    "prompt_variant": prompt_variant,
+                    "swapped": False,
+                    "response_a_multiplier": factor,
+                    "response_b_multiplier": 1,
+                    "reference_expert_emphasis": False,
+                })
+                conditions.append({
+                    "supplementary_experiment": "verbosity_bias",
+                    "supplementary_variant": f"response_b_{factor}x",
+                    "judge_type": judge_type,
+                    "prompt_variant": prompt_variant,
+                    "swapped": False,
+                    "response_a_multiplier": 1,
+                    "response_b_multiplier": factor,
+                    "reference_expert_emphasis": False,
+                })
+
+    # 3) Human Alignment Bias
+    for prompt_variant in prompt_variants:
+        conditions.append({
+            "supplementary_experiment": "human_alignment_bias",
+            "supplementary_variant": "baseline",
+            "judge_type": JudgeType.REFERENCE_GUIDED,
+            "prompt_variant": prompt_variant,
+            "swapped": False,
+            "response_a_multiplier": 1,
+            "response_b_multiplier": 1,
+            "reference_expert_emphasis": False,
+        })
+        conditions.append({
+            "supplementary_experiment": "human_alignment_bias",
+            "supplementary_variant": "human_expert_emphasis",
+            "judge_type": JudgeType.REFERENCE_GUIDED,
+            "prompt_variant": prompt_variant,
+            "swapped": False,
+            "response_a_multiplier": 1,
+            "response_b_multiplier": 1,
+            "reference_expert_emphasis": True,
+        })
+
+    return conditions
+
+
 async def process_chunk(
     async_client: AsyncOpenAI,
     model_name: str,
     chunk: list[tuple],
-    judge_type: JudgeType,
-    prompt_variant: PromptVariant,
+    condition: dict,
     temp: float,
     seed: int,
 ) -> tuple[list[tuple[str, dict]], int]:
     """Process one chunk and return (rows_with_keys, error_count)."""
     rows_with_keys: list[tuple[str, dict]] = []
     error_count = 0
-    use_chat_api = _should_use_chat_api(model_name)
+
+    judge_type = condition["judge_type"]
+    prompt_variant = condition["prompt_variant"]
+    swapped = condition["swapped"]
+    response_a_multiplier = condition["response_a_multiplier"]
+    response_b_multiplier = condition["response_b_multiplier"]
+    reference_expert_emphasis = condition["reference_expert_emphasis"]
+
+    transformed_pairs = [
+        _make_transformed_pair(
+            p,
+            response_a_multiplier=response_a_multiplier,
+            response_b_multiplier=response_b_multiplier,
+            reference_expert_emphasis=reference_expert_emphasis,
+        )
+        for p, _, _ in chunk
+    ]
 
     if judge_type == JudgeType.SINGLE_ANSWER:
-        inputs_a = []
-        inputs_b = []
-        for p, _, _ in chunk:
+        prompts_a = []
+        prompts_b = []
+        for transformed_pair in transformed_pairs:
             msgs_a = build_messages(
-                p,
+                transformed_pair,
                 judge_type,
                 prompt_variant,
                 which_response="a",
                 model_name=model_name,
             )
             msgs_b = build_messages(
-                p,
+                transformed_pair,
                 judge_type,
                 prompt_variant,
                 which_response="b",
                 model_name=model_name,
             )
-            if use_chat_api:
-                inputs_a.append(msgs_a)
-                inputs_b.append(msgs_b)
-            else:
-                inputs_a.append(_messages_to_prompt(msgs_a))
-                inputs_b.append(_messages_to_prompt(msgs_b))
-
-        generate_fn = batch_generate_messages if use_chat_api else batch_generate_prompts
+            prompts_a.append(_messages_to_prompt(msgs_a))
+            prompts_b.append(_messages_to_prompt(msgs_b))
 
         raw_as, raw_bs = await asyncio.gather(
-            generate_fn(
+            batch_generate_prompts(
                 async_client,
                 model_name,
-                inputs_a,
+                prompts_a,
                 temperature=temp,
                 top_p=TOP_P,
                 max_tokens=MAX_TOKENS,
                 seed=seed,
             ),
-            generate_fn(
+            batch_generate_prompts(
                 async_client,
                 model_name,
-                inputs_b,
+                prompts_b,
                 temperature=temp,
                 top_p=TOP_P,
                 max_tokens=MAX_TOKENS,
@@ -407,6 +422,7 @@ async def process_chunk(
                 "raw_output": None,
                 "judge_reason": None,
                 "pairwise_winner": None,
+                "pairwise_winner_presented": None,
             }
             if row_error_parts:
                 error_count += 1
@@ -416,24 +432,21 @@ async def process_chunk(
 
         return rows_with_keys, error_count
 
-    inputs = []
-    for p, _, _ in chunk:
+    prompts = []
+    for transformed_pair in transformed_pairs:
         msgs = build_messages(
-            p,
+            transformed_pair,
             judge_type,
             prompt_variant,
+            swapped=swapped,
             model_name=model_name,
         )
-        if use_chat_api:
-            inputs.append(msgs)
-        else:
-            inputs.append(_messages_to_prompt(msgs))
+        prompts.append(_messages_to_prompt(msgs))
 
-    generate_fn = batch_generate_messages if use_chat_api else batch_generate_prompts
-    raws = await generate_fn(
+    raws = await batch_generate_prompts(
         async_client,
         model_name,
-        inputs,
+        prompts,
         temperature=temp,
         top_p=TOP_P,
         max_tokens=MAX_TOKENS,
@@ -448,6 +461,8 @@ async def process_chunk(
                 "row_error": raw,
             }
         else:
+            presented_winner = parse_pairwise(raw)
+            normalized_winner = _normalize_swapped_winner(presented_winner, swapped)
             row = {
                 **base,
                 "which_response": None,
@@ -459,7 +474,8 @@ async def process_chunk(
                 "raw_output_b": None,
                 "raw_output": raw,
                 "judge_reason": parse_judge_reason(raw),
-                "pairwise_winner": parse_pairwise(raw),
+                "pairwise_winner_presented": presented_winner,
+                "pairwise_winner": normalized_winner,
             }
 
         rows_with_keys.append((run_key, row))
@@ -472,8 +488,7 @@ async def process_chunk_with_semaphore(
     async_client: AsyncOpenAI,
     model_name: str,
     chunk: list[tuple],
-    judge_type: JudgeType,
-    prompt_variant: PromptVariant,
+    condition: dict,
     temp: float,
     seed: int,
 ) -> tuple[list[tuple[str, dict]], int]:
@@ -483,8 +498,7 @@ async def process_chunk_with_semaphore(
                 async_client,
                 model_name,
                 chunk,
-                judge_type,
-                prompt_variant,
+                condition,
                 temp,
                 seed,
             )
@@ -495,9 +509,19 @@ async def process_chunk_with_semaphore(
             return rows_with_keys, len(chunk)
 
 
-def make_run_key(question_id: int, judge_type: str, prompt_variant: str, temperature: float, repeat_id: int) -> str:
-    # One logical experiment row per key. SINGLE_ANSWER keeps A/B in the same row.
-    return f"{question_id}|{judge_type}|{prompt_variant}|{temperature}|{repeat_id}"
+def make_run_key(
+    question_id: int,
+    supplementary_experiment: str,
+    supplementary_variant: str,
+    judge_type: str,
+    prompt_variant: str,
+    temperature: float,
+    repeat_id: int,
+) -> str:
+    return (
+        f"{question_id}|{supplementary_experiment}|{supplementary_variant}|"
+        f"{judge_type}|{prompt_variant}|{temperature}|{repeat_id}"
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -517,21 +541,22 @@ async_client = AsyncOpenAI(
     base_url=active_client._get_base_url(),
     api_key=model_cfg.api_key,
 )
-USE_CHAT_API = _should_use_chat_api(active_client.model_name)
-print(f"Request API: {'chat.completions' if USE_CHAT_API else 'completions'}")
-if CHAT_TEMPLATE_KWARGS is not None:
-    print(f"Chat template kwargs: {CHAT_TEMPLATE_KWARGS}")
 
 all_pairs = load_temp_bench(path=PATH_INPUT)
 print(f"Total pairs loaded: {len(all_pairs)}")
 
-pairs = all_pairs
+if SAMPLE_N is None:
+    pairs = all_pairs
+else:
+    pairs = sample_pairs(all_pairs, n=SAMPLE_N, seed=42)
+print(f"Pairs used: {len(pairs)}")
 
 safe_model_name = active_client.model_name.replace("/", "__")
-OUTPUT_JSONL = Path(project_root) / "output" / f"test_main_eval_stream_batch_{safe_model_name}.jsonl"
+OUTPUT_JSONL = Path(project_root) / "output" / f"supplementary_bias_eval_async_{safe_model_name}.jsonl"
 OUTPUT_JSONL.parent.mkdir(parents=True, exist_ok=True)
 
 SEEDS = [random.Random(BASE_SEED + i).randint(0, 2**31 - 1) for i in range(N_REPEATS)]
+SUPPLEMENTARY_CONDITIONS = build_supplementary_conditions()
 
 
 # -----------------------------------------------------------------------------
@@ -556,6 +581,8 @@ if OUTPUT_JSONL.exists():
             if not run_key:
                 run_key = make_run_key(
                     question_id=int(obj["question_id"]),
+                    supplementary_experiment=str(obj["supplementary_experiment"]),
+                    supplementary_variant=str(obj["supplementary_variant"]),
                     judge_type=str(obj["judge_type"]),
                     prompt_variant=str(obj["prompt_variant"]),
                     temperature=float(obj["temperature"]),
@@ -563,24 +590,24 @@ if OUTPUT_JSONL.exists():
                 )
             processed.add(run_key)
 
-expected_total = len(TEMPERATURES) * N_REPEATS * len(JUDGE_COMBOS) * len(pairs)
+expected_total = len(SUPPLEMENTARY_CONDITIONS) * len(TEMPERATURES) * N_REPEATS * len(pairs)
 print(f"Output JSONL: {OUTPUT_JSONL}")
 print(f"Batch size: {BATCH_SIZE}")
-print(f"Seeds: {SEEDS}")
+print(f"Supplementary conditions: {len(SUPPLEMENTARY_CONDITIONS)}")
 print(f"Resume state: {len(processed)} / {expected_total} already completed")
 
 
 # -----------------------------------------------------------------------------
-# Main batch loop
+# Main supplementary loop
 # -----------------------------------------------------------------------------
-async def run_batches() -> None:
+async def run_supplementary_batches() -> None:
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_BATCHES)
 
     with OUTPUT_JSONL.open("a", encoding="utf-8") as f:
         overall_pbar = tqdm(
             total=expected_total,
             initial=len(processed),
-            desc="overall",
+            desc="supplementary",
             unit="run",
             dynamic_ncols=True,
         )
@@ -588,18 +615,19 @@ async def run_batches() -> None:
         new_written = 0
         new_errors = 0
 
-        # Loop order: outer repeat_id -> middle judge combo -> inner temperature
         for repeat_id in range(N_REPEATS):
             seed = SEEDS[repeat_id]
 
-            for judge_type, prompt_variant in JUDGE_COMBOS:
+            for condition in SUPPLEMENTARY_CONDITIONS:
                 for temp in TEMPERATURES:
                     pending = []
                     for p in pairs:
                         run_key = make_run_key(
                             question_id=p.question_id,
-                            judge_type=judge_type.value,
-                            prompt_variant=prompt_variant.value,
+                            supplementary_experiment=condition["supplementary_experiment"],
+                            supplementary_variant=condition["supplementary_variant"],
+                            judge_type=condition["judge_type"].value,
+                            prompt_variant=condition["prompt_variant"].value,
                             temperature=temp,
                             repeat_id=repeat_id,
                         )
@@ -613,11 +641,17 @@ async def run_batches() -> None:
                             "model_b": p.model_b,
                             "human_winner": p.human_winner,
                             "judge_model": active_client.model_name,
-                            "judge_type": judge_type.value,
-                            "prompt_variant": prompt_variant.value,
+                            "supplementary_experiment": condition["supplementary_experiment"],
+                            "supplementary_variant": condition["supplementary_variant"],
+                            "judge_type": condition["judge_type"].value,
+                            "prompt_variant": condition["prompt_variant"].value,
                             "temperature": temp,
                             "repeat_id": repeat_id,
                             "seed": seed,
+                            "is_swapped": condition["swapped"],
+                            "response_a_multiplier": condition["response_a_multiplier"],
+                            "response_b_multiplier": condition["response_b_multiplier"],
+                            "reference_expert_emphasis": condition["reference_expert_emphasis"],
                         }
                         pending.append((p, base, run_key))
 
@@ -631,8 +665,7 @@ async def run_batches() -> None:
                                 async_client,
                                 active_client.model_name,
                                 chunk,
-                                judge_type,
-                                prompt_variant,
+                                condition,
                                 temp,
                                 seed,
                             )
@@ -658,7 +691,7 @@ async def run_batches() -> None:
         overall_pbar.close()
 
 
-asyncio.run(run_batches())
+asyncio.run(run_supplementary_batches())
 
 
 # -----------------------------------------------------------------------------
@@ -686,4 +719,12 @@ print(
     f"Done. Success rows: {len(exp_df)} | "
     f"Error rows: {error_count} | "
     f"Completed keys: {len(processed)}/{expected_total}"
+)
+print(
+    exp_df.groupby([
+        "supplementary_experiment",
+        "supplementary_variant",
+        "judge_type",
+        "prompt_variant",
+    ]).size().reset_index(name="n").head(20)
 )

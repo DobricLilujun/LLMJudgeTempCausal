@@ -38,9 +38,9 @@ print("Project root:", project_root)
 # -----------------------------------------------------------------------------
 # User config
 # -----------------------------------------------------------------------------
-MODEL_NAME = "google/gemma-3-27b-it"
-BASE_URL = "http://10.6.32.18:8001"
-MODEL_SIZE = "27B"
+MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
+BASE_URL = "http://0.0.0.0:8002"
+MODEL_SIZE = "8B"
 API_KEY = "token-abc123"
 
 PATH_INPUT = f"{project_root}/input/combined_dataset_with_reference_good_row_idx.json"
@@ -62,14 +62,6 @@ JUDGE_COMBOS = [
     (JudgeType.REFERENCE_GUIDED, PromptVariant.BASELINE),
     (JudgeType.REFERENCE_GUIDED, PromptVariant.COT),
 ]
-
-# None = auto detect. Set True to force chat, or False to force completions.
-FORCE_CHAT_API = None
-
-# Optional request-level chat template kwargs for reasoning models.
-# Example for Qwen3 non-thinking mode:
-# CHAT_TEMPLATE_KWARGS = {"enable_thinking": False}
-CHAT_TEMPLATE_KWARGS = None
 
 
 # -----------------------------------------------------------------------------
@@ -96,85 +88,6 @@ def _chunks(items: list, size: int):
         yield items[i:i + size]
 
 
-def _is_reasoning_model(model_name: str) -> bool:
-    lowered = model_name.lower()
-    markers = (
-        "qwq",
-        "deepseek-r1",
-        "deepseek_r1",
-        "reasoning",
-        "thinking",
-        "/o1",
-        "/o3",
-        "/o4",
-    )
-    return any(marker in lowered for marker in markers)
-
-
-def _should_use_chat_api(model_name: str) -> bool:
-    if FORCE_CHAT_API is not None:
-        return FORCE_CHAT_API
-    return _is_reasoning_model(model_name)
-
-
-def _chat_request_extra(seed: int | None) -> dict:
-    extra = {"seed": seed} if seed is not None else {}
-    if CHAT_TEMPLATE_KWARGS is not None:
-        extra["extra_body"] = {"chat_template_kwargs": CHAT_TEMPLATE_KWARGS}
-    return extra
-
-
-def _extract_chat_text(content) -> str:
-    if content is None:
-        return ""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item)
-                continue
-            if isinstance(item, dict):
-                text = item.get("text") or item.get("content")
-                if isinstance(text, str):
-                    parts.append(text)
-                continue
-            text = getattr(item, "text", None)
-            if isinstance(text, str):
-                parts.append(text)
-        return "".join(parts)
-    return str(content)
-
-
-async def _single_chat_completion(
-    async_client: AsyncOpenAI,
-    model_name: str,
-    messages: list[dict[str, str]],
-    temperature: float,
-    top_p: float,
-    max_tokens: int,
-    seed: int | None,
-) -> str:
-    response = await async_client.chat.completions.create(
-        model=model_name,
-        messages=messages,
-        temperature=temperature,
-        top_p=top_p,
-        max_tokens=max_tokens,
-        **_chat_request_extra(seed),
-    )
-    message = response.choices[0].message
-    text = _extract_chat_text(message.content)
-    if text:
-        return text
-
-    reasoning = getattr(message, "reasoning", None)
-    if reasoning is None:
-        reasoning = getattr(message, "reasoning_content", None)
-    return _extract_chat_text(reasoning)
-
-
 async def _single_completion(
     async_client: AsyncOpenAI,
     model_name: str,
@@ -195,48 +108,6 @@ async def _single_completion(
         **extra,
     )
     return response.choices[0].text or ""
-
-
-async def batch_generate_messages(
-    async_client: AsyncOpenAI,
-    model_name: str,
-    messages_list: list[list[dict[str, str]]],
-    temperature: float,
-    top_p: float,
-    max_tokens: int,
-    seed: int | None,
-) -> list[str]:
-    """Fallback chat path for reasoning/chat-only models."""
-    if not messages_list:
-        return []
-
-    request_limit = max(1, min(MAX_CONCURRENT_BATCHES, len(messages_list)))
-    request_semaphore = asyncio.Semaphore(request_limit)
-
-    async def run_one(messages: list[dict[str, str]]) -> str:
-        async with request_semaphore:
-            return await _single_chat_completion(
-                async_client,
-                model_name,
-                messages,
-                temperature,
-                top_p,
-                max_tokens,
-                seed,
-            )
-
-    results = await asyncio.gather(
-        *[run_one(messages) for messages in messages_list],
-        return_exceptions=True,
-    )
-
-    outputs = []
-    for result in results:
-        if isinstance(result, Exception):
-            outputs.append(f"ERROR: {result}")
-        else:
-            outputs.append(result)
-    return outputs
 
 
 async def batch_generate_prompts(
@@ -338,11 +209,10 @@ async def process_chunk(
     """Process one chunk and return (rows_with_keys, error_count)."""
     rows_with_keys: list[tuple[str, dict]] = []
     error_count = 0
-    use_chat_api = _should_use_chat_api(model_name)
 
     if judge_type == JudgeType.SINGLE_ANSWER:
-        inputs_a = []
-        inputs_b = []
+        prompts_a = []
+        prompts_b = []
         for p, _, _ in chunk:
             msgs_a = build_messages(
                 p,
@@ -358,29 +228,23 @@ async def process_chunk(
                 which_response="b",
                 model_name=model_name,
             )
-            if use_chat_api:
-                inputs_a.append(msgs_a)
-                inputs_b.append(msgs_b)
-            else:
-                inputs_a.append(_messages_to_prompt(msgs_a))
-                inputs_b.append(_messages_to_prompt(msgs_b))
-
-        generate_fn = batch_generate_messages if use_chat_api else batch_generate_prompts
+            prompts_a.append(_messages_to_prompt(msgs_a))
+            prompts_b.append(_messages_to_prompt(msgs_b))
 
         raw_as, raw_bs = await asyncio.gather(
-            generate_fn(
+            batch_generate_prompts(
                 async_client,
                 model_name,
-                inputs_a,
+                prompts_a,
                 temperature=temp,
                 top_p=TOP_P,
                 max_tokens=MAX_TOKENS,
                 seed=seed,
             ),
-            generate_fn(
+            batch_generate_prompts(
                 async_client,
                 model_name,
-                inputs_b,
+                prompts_b,
                 temperature=temp,
                 top_p=TOP_P,
                 max_tokens=MAX_TOKENS,
@@ -416,7 +280,7 @@ async def process_chunk(
 
         return rows_with_keys, error_count
 
-    inputs = []
+    prompts = []
     for p, _, _ in chunk:
         msgs = build_messages(
             p,
@@ -424,16 +288,12 @@ async def process_chunk(
             prompt_variant,
             model_name=model_name,
         )
-        if use_chat_api:
-            inputs.append(msgs)
-        else:
-            inputs.append(_messages_to_prompt(msgs))
+        prompts.append(_messages_to_prompt(msgs))
 
-    generate_fn = batch_generate_messages if use_chat_api else batch_generate_prompts
-    raws = await generate_fn(
+    raws = await batch_generate_prompts(
         async_client,
         model_name,
-        inputs,
+        prompts,
         temperature=temp,
         top_p=TOP_P,
         max_tokens=MAX_TOKENS,
@@ -517,10 +377,6 @@ async_client = AsyncOpenAI(
     base_url=active_client._get_base_url(),
     api_key=model_cfg.api_key,
 )
-USE_CHAT_API = _should_use_chat_api(active_client.model_name)
-print(f"Request API: {'chat.completions' if USE_CHAT_API else 'completions'}")
-if CHAT_TEMPLATE_KWARGS is not None:
-    print(f"Chat template kwargs: {CHAT_TEMPLATE_KWARGS}")
 
 all_pairs = load_temp_bench(path=PATH_INPUT)
 print(f"Total pairs loaded: {len(all_pairs)}")
