@@ -15,3 +15,4 @@ vllm>=0.17.1
 dowhy>=0.14
 ipywidgets>=8.1.8
 jupyter>=1.1.1
+sentence-transformers>=5.3.0
