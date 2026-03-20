@@ -1,80 +1,193 @@
 # LLMJudgeTempCausal
 
-Causal analysis framework for evaluating how **temperature** affects **LLM-as-a-Judge** stability and performance, using the [MT-Bench Human Judgments](https://huggingface.co/datasets/lmsys/mt_bench_human_judgments) dataset (3,355 pairwise human annotations across 80 multi-turn questions and 6 models) as ground truth.
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Package](https://img.shields.io/badge/package-src%2Fllmjudgetempcausal-informational)](src/llmjudgetempcausal)
+[![Hugging Face Profile](https://img.shields.io/badge/HuggingFace-Volavion-yellow?logo=huggingface)](https://huggingface.co/Volavion)
+[![Hugging Face Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow?logo=huggingface)](https://huggingface.co/datasets/Volavion/eval_temperatures_bench)
 
-## Core Research Questions
+A causal analysis and evaluation framework for studying how decoding temperature affects LLM-as-a-Judge reliability, agreement with human preference, consistency, and bias.
 
-1. **Score & ranking stability** — Are absolute scores and relative rankings from LLM judges stable across temperatures?
-2. **Judge type impact** — How do pairwise comparison, single-answer scoring (1–10), and reference-guided scoring differ in agreement and performance at different temperatures?
-3. **Prompt engineering effects** — How do position swap, few-shot, chain-of-thought (CoT), reference-guided, and multi-turn prompting strategies affect judge performance?
-4. **Model size effects** — How does judge model size (e.g., 1B vs 7B vs 70B) interact with temperature sensitivity?
+This project combines:
+- structured LLM judging (pairwise, single-answer, reference-guided),
+- prompt strategy interventions (baseline, position-swap, few-shot, CoT, reference-guided, multi-turn),
+- multi-temperature sweeps,
+- causal effect estimation (simple ATE + DML),
+- and reproducible result artifacts (CSV/JSON/plots).
 
-## Causal Framework
+## Hugging Face (Homepage Links)
 
-The project builds a **Directed Acyclic Graph (DAG)** and uses **do-calculus** to isolate the causal effect of temperature:
+- Team/Profile: https://huggingface.co/Volavion
+- Project dataset: https://huggingface.co/datasets/Volavion/eval_temperatures_bench
+- Upstream benchmark used by this project: https://huggingface.co/datasets/lmsys/mt_bench_human_judgments
 
-```
-Temperature ──→ Judgment ──→ Metrics
-     ↑              ↑           ↑
-JudgeModelSize ─────┤           │
-PromptType ─────────┘           │
-InputResponses ────→ Judgment   │
-HumanJudgment ─────────────→ Metrics
-```
+## Table of Contents
 
-**ATE estimation**: `ATE = E[Metrics | do(T=0.0)] − E[Metrics | do(T=1.0)]`
+- [1. Why This Project](#1-why-this-project)
+- [2. Research Questions](#2-research-questions)
+- [3. Causal Design](#3-causal-design)
+- [4. Metrics](#4-metrics)
+- [5. Repository Layout](#5-repository-layout)
+- [6. Requirements](#6-requirements)
+- [7. Installation](#7-installation)
+- [8. Quick Start](#8-quick-start)
+- [9. CLI Reference](#9-cli-reference)
+- [10. Script-Based Workflows](#10-script-based-workflows)
+- [11. Data Sources and Input Format](#11-data-sources-and-input-format)
+- [12. Output Artifacts](#12-output-artifacts)
+- [13. Reproducibility Checklist](#13-reproducibility-checklist)
+- [14. Troubleshooting](#14-troubleshooting)
+- [15. Contributing](#15-contributing)
+- [16. Citation](#16-citation)
+- [17. License](#17-license)
 
-Methods: Simple difference-in-means, ANOVA, Double Machine Learning (DML via `econml`), stratified analysis by prompt type and model size.
+## 1. Why This Project
 
-## Evaluation Metrics
+LLM-as-a-Judge is now common in evaluation pipelines, but its behavior is sensitive to generation settings. Temperature is often tuned for diversity, yet even small changes can alter:
 
-| Metric | Description |
-|--------|-------------|
-| **Agreement S1** | Match rate with human labels (ties & disagreements count as agreement) |
-| **Agreement S2** | Match rate among non-tie cases only |
-| **Consistency** | Same verdict when A/B positions are swapped |
-| **Error Rate** | Fraction of outputs that fail to parse (not `[[A]]`/`[[B]]`/`[[C]]` or `[[1-10]]`) |
-| **Position Bias** | `P(first wins) − P(second wins)` — deviation from fair 50/50 |
-| **Score Statistics** | Mean, std of absolute scores (single-answer & reference-guided) |
-| **Ranking Correlation** | Kendall τ and Spearman ρ between judge scores and human preference |
+- absolute scores,
+- pairwise winner decisions,
+- model ranking order,
+- parse validity,
+- and judge-side bias patterns.
 
-## Installation
+LLMJudgeTempCausal is designed to quantify these effects with both descriptive and causal analysis, so evaluation choices are traceable and defensible.
 
-Requires **Python ≥ 3.11** and [uv](https://github.com/astral-sh/uv).
+## 2. Research Questions
 
-```bash
-git clone <repo-url> && cd LLMJudgeTempCausal
+1. How stable are judge decisions and scores across temperatures?
+2. Do different judge types react differently to temperature?
+3. How much do prompt strategies mediate temperature effects?
+4. Are there systematic shifts in consistency, error rate, or position bias?
+5. After controlling confounders (prompt/model), what is the causal effect of temperature on agreement?
+
+## 3. Causal Design
+
+The project models temperature as treatment and agreement-like quality metrics as outcomes, while controlling for confounders such as prompt strategy and model identity/size.
+
+Conceptual DAG:
+
+    Temperature ------> Judge Output ------> Metrics
+         ^                 ^                   ^
+         |                 |                   |
+    Model/Size ------------|                   |
+    Prompt Variant --------|                   |
+    Input Pair ------------------------------->|
+    Human Label ------------------------------->|
+
+Core estimands and analysis routines:
+
+- simple ATE on transformed analysis table,
+- DML-based ATE via econml,
+- stratified analysis by prompt and model label,
+- consistency analysis under position swap.
+
+## 4. Metrics
+
+| Metric | Meaning |
+|---|---|
+| Agreement S1 | Agreement with human signal under project-defined matching policy |
+| Agreement S2 | Agreement on stricter subsets (for robustness views) |
+| Consistency | Stability when A/B positions are swapped |
+| Error Rate | Fraction of unparsable judge outputs |
+| Position Bias | Difference between first-position and second-position win tendency |
+| Score Stats | Mean/std for score-based judge modes |
+
+## 5. Repository Layout
+
+Top-level:
+
+    .
+    |- main.py
+    |- exp_main.py
+    |- exp_main_batch_async.py
+    |- exp_main_batch_async_copy.py
+    |- exp_main_batch_async_supplementary.py
+    |- input/
+    |- output/
+    |- results_test/
+    |- notebook/
+    |- src/
+    |- pyproject.toml
+    |- README.md
+
+Package modules:
+
+    src/llmjudgetempcausal/
+    |- cli.py          # Click commands: run / analyze / dag
+    |- experiment.py   # Orchestration and end-to-end pipeline
+    |- data.py         # Dataset loading and sampling
+    |- client.py       # LLM client wrapper (OpenAI-compatible backends)
+    |- prompts.py      # Prompt builders across judge modes/variants
+    |- judge.py        # Output parsing and judge result handling
+    |- metrics.py      # Aggregation and metric computation
+    |- causal.py       # Causal graph + ATE/DML estimators
+    |- visualize.py    # Plot generation
+    |- config.py       # Experiment/model dataclasses and enums
+
+## 6. Requirements
+
+- Python 3.11+
+- uv (recommended)
+- A running inference backend endpoint (vLLM, SGLang, or OpenAI-compatible server/API)
+
+Main dependencies (from pyproject.toml):
+
+- datasets
+- openai
+- jinja2
+- numpy
+- pandas
+- scipy
+- scikit-learn
+- econml
+- pgmpy
+- dowhy
+- matplotlib
+- seaborn
+- tqdm
+- click
+- vllm
+
+## 7. Installation
+
+### Option A (recommended, uv)
+
+~~~bash
+git clone <your-repo-url>
+cd LLMJudgeTempCausal
 uv sync
-```
+~~~
 
-This installs all dependencies: `datasets`, `openai`, `numpy`, `pandas`, `scipy`, `scikit-learn`, `econml`, `pgmpy`, `matplotlib`, `seaborn`, `tqdm`, `click`.
+### Option B (pip/venv)
 
-## Quick Start
+~~~bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+~~~
 
-### 1. Start a local LLM server
+## 8. Quick Start
 
-Using **vLLM**:
-```bash
+### Step 1: Launch a model server
+
+Example with vLLM:
+
+~~~bash
 uv run vllm serve google/gemma-3-1b-it --gpu-memory-utilization 0.5
-# Server at http://localhost:8000
-```
+# default endpoint: http://localhost:8000
+~~~
 
-Or **SGLang**:
-```bash
-python -m sglang.launch_server --model meta-llama/Llama-3-8B-Instruct --port 8001
-```
+### Step 2: Run a smoke test
 
-### 2. Run a quick test
-
-```bash
+~~~bash
 uv run python main.py --quick-test
-```
+~~~
 
-This runs a minimal experiment (5 samples, 2 repeats, 3 temperatures, 2 judge types, 2 prompt variants) and outputs to `results_test/`.
+This executes a small configuration and writes artifacts to results_test/.
 
-### 3. Run a full experiment
+### Step 3: Run a full configurable experiment
 
-```bash
+~~~bash
 uv run llmjudge run \
   -m google/gemma-3-1b-it \
   -u http://localhost:8000 \
@@ -83,135 +196,224 @@ uv run llmjudge run \
   -n 100 \
   -r 10 \
   -o results
-```
+~~~
 
-## CLI Reference
+### Step 4: Re-analyze existing outputs
 
-### `llmjudge run` — Run experiment
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `-m, --model` | *(required, repeatable)* | Model name (e.g., `google/gemma-3-1b-it`) |
-| `-u, --base-url` | *(required, repeatable)* | Server URL (e.g., `http://localhost:8000`) |
-| `-k, --api-key` | `EMPTY` | API key per model |
-| `-b, --backend` | `vllm` | Backend: `vllm`, `sglang`, `openai` |
-| `-s, --model-size` | *(auto)* | Size label: `1B`, `7B`, `70B` |
-| `-t, --temperatures` | `0.0,0.2,0.4,0.6,0.8,1.0` | Comma-separated temperatures |
-| `-j, --judge-types` | `pairwise,single_answer,reference_guided` | Judge types |
-| `-p, --prompt-variants` | `baseline,position_swap,few_shot,cot,reference_guided,multi_turn` | Prompt variants |
-| `-r, --num-repeats` | `10` | Repeats per config |
-| `-n, --sample-size` | `100` | Pairs to sample from dataset |
-| `--seed` | `42` | Random seed |
-| `--top-p` | `0.95` | Top-p sampling |
-| `--max-tokens` | `1024` | Max generation tokens |
-| `-o, --output-dir` | `results` | Output directory |
-| `-v, --verbose` | off | Debug logging |
-
-### `llmjudge analyze` — Re-analyze existing results
-
-```bash
+~~~bash
 uv run llmjudge analyze -d results
-```
+~~~
 
-Re-runs metric aggregation, causal analysis (DAG + DML + ATE), and generates all plots from a saved `results.csv`.
+### Step 5: Export causal DAG only
 
-### `llmjudge dag` — Generate causal DAG only
-
-```bash
+~~~bash
 uv run llmjudge dag -o results/causal_dag.png
-```
+~~~
 
-## Multi-Model Example
+## 9. CLI Reference
 
-```bash
-# Compare a small and large model
-uv run llmjudge run \
-  -m google/gemma-3-1b-it -u http://localhost:8000 -s 1B -b vllm \
-  -m meta-llama/Llama-3-70B-Instruct -u http://server2:8001 -s 70B -b vllm \
-  -n 500 -r 5 -o results_multi
+### llmjudge run
 
-# Use OpenAI API
-uv run llmjudge run \
-  -m gpt-4o -u https://api.openai.com -k "$OPENAI_API_KEY" -s GPT4o -b openai \
-  -n 200 -r 10 -o results_openai
-```
+| Option | Type | Default | Description |
+|---|---|---|---|
+| -m, --model | repeatable str | required | Model name per endpoint |
+| -u, --base-url | repeatable str | required | Base URL per model |
+| -k, --api-key | repeatable str | EMPTY | API key list (aligned by index) |
+| -b, --backend | repeatable str | vllm | vllm / sglang / openai |
+| -s, --model-size | repeatable str | auto | Label for stratified analysis |
+| -t, --temperatures | csv float | 0.0,0.2,0.4,0.6,0.8,1.0 | Treatment grid |
+| -j, --judge-types | csv str | pairwise,single_answer,reference_guided | Judge modes |
+| -p, --prompt-variants | csv str | baseline,position_swap,few_shot,cot,reference_guided,multi_turn | Prompt interventions |
+| -r, --num-repeats | int | 10 | Repeat count |
+| -n, --sample-size | int | 100 | Number of sampled pairs |
+| --seed | int | 42 | Sampling seed |
+| --top-p | float | 0.95 | Decoding top-p |
+| --max-tokens | int | 1024 | Generation limit |
+| -o, --output-dir | str | results | Output folder |
+| -v, --verbose | flag | false | Debug logging |
 
-## Output Files
+### llmjudge analyze
 
-After running an experiment, the output directory contains:
+~~~bash
+uv run llmjudge analyze -d <results_dir>
+~~~
 
-### Data
-| File | Content |
-|------|---------|
-| `results.csv` | Raw per-sample judge results |
-| `metrics_by_temperature.csv` | Metrics aggregated by temperature |
-| `metrics_by_temp_model.csv` | Metrics by temperature × model |
-| `metrics_by_temp_prompt.csv` | Metrics by temperature × prompt variant |
-| `metrics_by_temp_judgetype.csv` | Metrics by temperature × judge type |
-| `consistency_orig.csv` | Original-order pairwise results |
-| `consistency_swap.csv` | Swapped-order pairwise results |
-| `analysis.json` | Full causal analysis (ATE, DML, ANOVA, stratified effects) |
+Rebuilds aggregate CSV files, analysis.json, and figures from results.csv.
 
-### Visualizations
-| File | Content |
-|------|---------|
-| `causal_dag.png` | Causal DAG |
-| `plot_metrics_by_temperature.png` | All metrics vs temperature (line plots) |
-| `plot_causal_forest.png` | Forest plot of ATE estimates |
-| `plot_consistency.png` | Consistency by temperature |
-| `plot_position_bias.png` | Position bias by temperature |
-| `plot_scores_*.png` | Score distributions by temperature (box plots) |
-| `heatmap_agreement_*.png` | Agreement heatmaps (T × Prompt, T × Model) |
-| `heatmap_error_rate_*.png` | Error rate heatmaps |
-| `heatmap_jt_*.png` | Judge type × temperature heatmaps |
-| `heatmap_model_*.png` | Model × temperature heatmaps |
+### llmjudge dag
 
-## Project Architecture
+~~~bash
+uv run llmjudge dag -o <output_png>
+~~~
 
-```
-src/llmjudgetempcausal/
-├── config.py       # Configuration: enums, ModelConfig, ExperimentConfig
-├── data.py         # MT-Bench dataset loading & pair sampling
-├── client.py       # Unified LLM client (vLLM/SGLang/OpenAI + completions fallback)
-├── prompts.py      # Prompt templates: 6 variants × 3 judge types
-├── judge.py        # Judge execution, output parsing ([[A]], [[B]], [[C]], [[1-10]])
-├── metrics.py      # Agreement, Consistency, Error rate, Position bias, score stats
-├── causal.py       # DAG (pgmpy), Simple ATE, DML ATE (econml), ANOVA, stratified
-├── experiment.py   # Orchestrator: runs all configs, saves results, triggers analysis
-├── visualize.py    # 8 plot generators: heatmaps, line plots, forest, box plots
-└── cli.py          # Click CLI: run, analyze, dag commands
-```
+## 10. Script-Based Workflows
 
-## Supported Configurations
+In addition to CLI, this repository includes script-driven pipelines for high-throughput or custom supplementary studies.
 
-### Backends
-- **vLLM** — Local GPU server via `vllm serve`
-- **SGLang** — Local GPU server via `sglang.launch_server`
-- **OpenAI** — Cloud API (GPT-4o, etc.)
+### exp_main.py
 
-All backends use the OpenAI-compatible chat completions API, with automatic fallback to text completions if chat endpoint fails.
+- Stream-style experiment writing JSONL outputs.
+- Useful for custom local runs and iterative debugging.
 
-### Judge Types
-- **Pairwise** — "Which response is better? Output `[[A]]`, `[[B]]`, or `[[C]]` for tie"
-- **Single-answer** — "Rate this response 1–10. Output `[[score]]`"
-- **Reference-guided** — "Compare to reference answer and rate 1–10. Output `[[score]]`"
+Run:
 
-### Prompt Variants
-- **Baseline** — Standard judge prompt
-- **Position swap** — Randomly flip A/B order to measure position bias
-- **Few-shot** — Include 3 example judgments
-- **CoT (Chain-of-thought)** — "First compare helpfulness, then coherence, then decide"
-- **Reference-guided** — Include factual accuracy hint
-- **Multi-turn** — Include full conversation context (turn 1 + turn 2)
+~~~bash
+uv run python exp_main.py
+~~~
 
-## Analysis Pipeline
+### exp_main_batch_async.py
 
-1. **Descriptive statistics** — Metrics by temperature, model, prompt, judge type
-2. **Causal inference** — DML-estimated ATE of temperature on agreement, controlling for prompt/model
-3. **Stability testing** — Spearman ρ (scores across temperatures), ANOVA for significance
-4. **Stratified effects** — Heterogeneous treatment effects by prompt variant and model size
-5. **Visualizations** — Heatmaps, forest plots, line charts, box plots
+- Async batched requests using AsyncOpenAI-compatible endpoint.
+- Includes chunking, batching, fallback behavior, and resumable writes.
 
-## License
+Run:
 
-MIT
+~~~bash
+uv run python exp_main_batch_async.py
+~~~
+
+### exp_main_batch_async_copy.py
+
+- Variant of the async batch runner tuned for another model endpoint setup.
+
+Run:
+
+~~~bash
+uv run python exp_main_batch_async_copy.py
+~~~
+
+### exp_main_batch_async_supplementary.py
+
+- Supplementary controlled experiments (position bias, verbosity bias, human-alignment framing).
+
+Run:
+
+~~~bash
+uv run python exp_main_batch_async_supplementary.py
+~~~
+
+Note: exp_main_batch.py currently exists as an empty placeholder file.
+
+## 11. Data Sources and Input Format
+
+### Upstream benchmark loader
+
+The default package loader uses:
+
+- dataset id: lmsys/mt_bench_human_judgments
+
+### Local TempBench-style loader
+
+The local JSON/JSONL path-based flow supports rows with fields like:
+
+- row_idx or question_id
+- model_a, model_b
+- winner
+- conversation_a, conversation_b
+- reference_answer (optional)
+
+Example local files in this repo:
+
+- input/combined_dataset_with_reference_good_row_idx.json
+- src/llmjudgetempcausal/assets/mmlu_pro_judged_stream.jsonl (if generated/populated)
+
+## 12. Output Artifacts
+
+A typical run directory includes:
+
+### Core tables
+
+- results.csv
+- metrics_by_temperature.csv
+- metrics_by_temp_model.csv
+- metrics_by_temp_prompt.csv
+- metrics_by_temp_judgetype.csv
+- consistency_orig.csv
+- consistency_swap.csv
+- analysis.json
+
+### Figures
+
+- causal_dag.png
+- plot_metrics_by_temperature.png
+- plot_causal_forest.png
+- plot_consistency.png
+- plot_position_bias.png
+- plot_scores_single_answer.png
+- heatmap_agreement_s1.png
+- heatmap_agreement_s2.png
+- heatmap_error_rate_pairwise.png
+- heatmap_jt_error_rate_pairwise.png
+- heatmap_jt_error_rate_single_answer.png
+- heatmap_model_agreement_s1.png
+- heatmap_model_agreement_s2.png
+- heatmap_model_error_rate_pairwise.png
+
+You can inspect a concrete sample under results_test/.
+
+## 13. Reproducibility Checklist
+
+1. Pin environment with uv sync.
+2. Record model name, endpoint, backend, and decoding params.
+3. Set seed and keep it in logs/output.
+4. Keep raw result files (results.csv or JSONL stream outputs).
+5. Re-run llmjudge analyze from saved outputs.
+6. Version-control plots and analysis.json for paper figures.
+
+## 14. Troubleshooting
+
+### Endpoint connectivity errors
+
+- Verify server is reachable from your runtime host.
+- Confirm base URL and port mapping.
+- Test with a minimal chat/completions request first.
+
+### High parse_error rate
+
+- Lower temperature.
+- Tighten prompt format instructions.
+- Increase max_tokens if outputs are being truncated.
+
+### Slow throughput
+
+- Use async batch scripts for large sweeps.
+- Increase batch size carefully based on GPU memory.
+- Subsample pairs during iteration, then scale up.
+
+### Analyze command fails due to missing files
+
+- Ensure results.csv exists in target directory.
+- Run full experiment first, then analyze.
+
+## 15. Contributing
+
+Contributions are welcome.
+
+Recommended workflow:
+
+1. Create a feature branch.
+2. Add/modify code in src/llmjudgetempcausal or scripts.
+3. Validate with a small local run (main.py --quick-test).
+4. Open a PR with:
+   - motivation,
+   - reproducible command,
+   - and before/after artifacts when relevant.
+
+## 16. Citation
+
+If you use this project in academic work, please cite:
+
+~~~bibtex
+@software{llmjudgetempcausal,
+  title  = {LLMJudgeTempCausal: Causal Analysis of Temperature Effects in LLM-as-a-Judge},
+  author = {LLMJudgeTempCausal Contributors},
+  year   = {2026},
+  url    = {https://github.com/<your-org>/LLMJudgeTempCausal}
+}
+~~~
+
+## 17. License
+
+No root LICENSE file is currently committed in this repository.
+
+If you plan to open-source this project publicly, add a LICENSE file (for example MIT, Apache-2.0, or BSD-3-Clause) before release.
