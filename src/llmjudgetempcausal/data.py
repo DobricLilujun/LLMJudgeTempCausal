@@ -78,8 +78,8 @@ def load_temp_bench(
 ) -> list[JudgePair]:
     """Load the TempBench dataset from a local judged JSONL file.
 
-    The JSONL is produced by the datasets.ipynb pipeline:
-      mmlu_pro_answers_stream.jsonl  →  (GPT judge)  →  mmlu_pro_judged_stream.jsonl
+        The JSONL is produced by the dataset preparation pipeline:
+            mmlu_pro_answers_stream.jsonl -> (GPT judge) -> mmlu_pro_judged_stream.jsonl
 
     Each row must contain: row_idx, model_a, model_b, winner,
     conversation_a, conversation_b.

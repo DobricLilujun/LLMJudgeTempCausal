@@ -1,18 +1,24 @@
+"""Streaming experiment runner for local single-endpoint evaluation.
+
+This script writes one JSON line per evaluated configuration row and supports
+resume-by-key behavior. It is intentionally explicit (not hidden behind CLI)
+so researchers can tweak loop order and output schema for case studies.
+"""
+
 import logging
-import sys
 import os
-from llmjudgetempcausal.prompts import build_messages
-from llmjudgetempcausal.data import load_temp_bench, sample_pairs
-from llmjudgetempcausal.client import LLMClient
 import json
 import random
+import sys
 from pathlib import Path
 
 import pandas as pd
 from tqdm.auto import tqdm
 
+from llmjudgetempcausal.client import LLMClient
+from llmjudgetempcausal.data import load_temp_bench, sample_pairs
+from llmjudgetempcausal.judge import parse_judge_reason, parse_pairwise, parse_score
 from llmjudgetempcausal.prompts import build_messages
-from llmjudgetempcausal.judge import parse_pairwise, parse_score, parse_judge_reason
 
 
 # Ensure the project root is on the path
@@ -36,7 +42,6 @@ print("Project root:", project_root)
 
 from llmjudgetempcausal.config import (
     BackendType,
-    ExperimentConfig,
     JudgeType,
     ModelConfig,
     PromptVariant,
@@ -95,10 +100,10 @@ print(f"\nResponse A (first 300 chars):\n{pair.response_a[:500]}")
 print(f"\nResponse B (first 300 chars):\n{pair.response_b[:500]}")
 
 
-# Qwen client (default for most tests below)
+# Initialize the active judge client once and reuse it across all runs.
 client = LLMClient(model_cfg)
 print(f"Qwen client:  {client.model_name}  @ {client._get_base_url()}")
-active_client = client  # for easy switching in the notebook
+active_client = client  # swap this variable if multiple clients are tested
 
 OUTPUT_JSONL = Path(project_root) / "output" / f"test_main_eval_stream_{active_client.model_name}.jsonl"
 OUTPUT_JSONL.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +111,11 @@ OUTPUT_JSONL.parent.mkdir(parents=True, exist_ok=True)
 
 
 def make_run_key(question_id: int, judge_type: str, prompt_variant: str, temperature: float, repeat_id: int) -> str:
-    # One logical experiment row per key. SINGLE_ANSWER keeps A/B in the same row.
+    """Build a deterministic id used for resume-safe deduplication.
+
+    One logical experiment row corresponds to one run key. For single-answer
+    mode, A/B scoring is still stored in one logical row.
+    """
     return f"{question_id}|{judge_type}|{prompt_variant}|{temperature}|{repeat_id}"
 
 
@@ -280,7 +289,7 @@ with OUTPUT_JSONL.open("a", encoding="utf-8") as f:
     overall_pbar.close()
 
 
-# Reload successful rows for analysis
+# Reload successful rows for quick sanity-check analysis in-memory.
 rows = []
 error_count = 0
 with OUTPUT_JSONL.open("r", encoding="utf-8") as f:

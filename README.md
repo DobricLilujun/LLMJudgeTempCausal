@@ -105,7 +105,6 @@ Top-level:
     |- input/
     |- output/
     |- results_test/
-    |- notebook/
     |- src/
     |- pyproject.toml
     |- README.md

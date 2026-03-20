@@ -1,3 +1,10 @@
+"""Asynchronous batch evaluator variant for a fixed completions-only setup.
+
+This variant keeps the same resume and batching strategy as the main async
+runner, but intentionally uses prompt/completions requests for servers where
+chat endpoints are not desired.
+"""
+
 import asyncio
 import json
 import logging
@@ -84,6 +91,7 @@ def _messages_to_prompt(messages: list[dict[str, str]]) -> str:
 
 
 def _chunks(items: list, size: int):
+    """Yield fixed-size chunks from a list."""
     for i in range(0, len(items), size):
         yield items[i:i + size]
 
@@ -97,6 +105,7 @@ async def _single_completion(
     max_tokens: int,
     seed: int | None,
 ) -> str:
+    """Run one completion request for a single serialized prompt."""
     extra = {"seed": seed} if seed is not None else {}
     response = await async_client.completions.create(
         model=model_name,
@@ -337,6 +346,7 @@ async def process_chunk_with_semaphore(
     temp: float,
     seed: int,
 ) -> tuple[list[tuple[str, dict]], int]:
+    """Guard chunk execution with a semaphore and emit row-level errors."""
     async with semaphore:
         try:
             return await process_chunk(
@@ -356,7 +366,7 @@ async def process_chunk_with_semaphore(
 
 
 def make_run_key(question_id: int, judge_type: str, prompt_variant: str, temperature: float, repeat_id: int) -> str:
-    # One logical experiment row per key. SINGLE_ANSWER keeps A/B in the same row.
+    """Build deterministic dedup key for resume-safe incremental writes."""
     return f"{question_id}|{judge_type}|{prompt_variant}|{temperature}|{repeat_id}"
 
 
@@ -430,6 +440,7 @@ print(f"Resume state: {len(processed)} / {expected_total} already completed")
 # Main batch loop
 # -----------------------------------------------------------------------------
 async def run_batches() -> None:
+    """Execute full async batched evaluation and stream results to JSONL."""
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_BATCHES)
 
     with OUTPUT_JSONL.open("a", encoding="utf-8") as f:

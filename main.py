@@ -26,12 +26,18 @@ from llmjudgetempcausal.experiment import ExperimentRunner
 
 
 def quick_test():
-    """Run a minimal test with the local vLLM server."""
+    """Run a small end-to-end smoke test.
+
+    The quick test intentionally uses a tiny configuration so contributors can
+    validate environment setup, endpoint connectivity, parsing, aggregation,
+    and plotting in a few minutes before launching larger sweeps.
+    """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
+    # Keep this config intentionally tiny to minimize runtime and API cost.
     config = ExperimentConfig(
         temperatures=[0.0, 0.5, 1.0],
         judge_types=[JudgeType.PAIRWISE, JudgeType.SINGLE_ANSWER],
@@ -49,11 +55,14 @@ def quick_test():
         ],
     )
 
+    # Run the full pipeline (judge -> metrics -> causal analysis -> plots).
     runner = ExperimentRunner(config)
     runner.run_all()
 
 
 if __name__ == "__main__":
+    # ``--quick-test`` is a convenient shortcut for local validation.
+    # Otherwise, delegate to the full Click CLI entrypoint.
     if "--quick-test" in sys.argv:
         quick_test()
     else:

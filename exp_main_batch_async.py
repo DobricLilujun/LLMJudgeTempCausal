@@ -1,3 +1,12 @@
+"""Asynchronous batch evaluator for high-throughput judge sweeps.
+
+This script is optimized for OpenAI-compatible inference servers and supports:
+- resumable JSONL writes,
+- batched completions requests,
+- optional chat-mode routing for reasoning models,
+- and bounded concurrency to protect serving stability.
+"""
+
 import asyncio
 import json
 import logging
@@ -92,11 +101,13 @@ def _messages_to_prompt(messages: list[dict[str, str]]) -> str:
 
 
 def _chunks(items: list, size: int):
+    """Yield fixed-size chunks from a sequence-like list."""
     for i in range(0, len(items), size):
         yield items[i:i + size]
 
 
 def _is_reasoning_model(model_name: str) -> bool:
+    """Heuristic check for model names that usually require chat endpoint."""
     lowered = model_name.lower()
     markers = (
         "qwq",
@@ -112,12 +123,14 @@ def _is_reasoning_model(model_name: str) -> bool:
 
 
 def _should_use_chat_api(model_name: str) -> bool:
+    """Decide request API mode using override flag + model-name heuristic."""
     if FORCE_CHAT_API is not None:
         return FORCE_CHAT_API
     return _is_reasoning_model(model_name)
 
 
 def _chat_request_extra(seed: int | None) -> dict:
+    """Build optional chat request kwargs (seed/template overrides)."""
     extra = {"seed": seed} if seed is not None else {}
     if CHAT_TEMPLATE_KWARGS is not None:
         extra["extra_body"] = {"chat_template_kwargs": CHAT_TEMPLATE_KWARGS}
@@ -125,6 +138,7 @@ def _chat_request_extra(seed: int | None) -> dict:
 
 
 def _extract_chat_text(content) -> str:
+    """Normalize different chat content payload shapes into plain text."""
     if content is None:
         return ""
     if isinstance(content, str):
@@ -156,6 +170,7 @@ async def _single_chat_completion(
     max_tokens: int,
     seed: int | None,
 ) -> str:
+    """Run one chat completion request and extract response/reasoning text."""
     response = await async_client.chat.completions.create(
         model=model_name,
         messages=messages,
@@ -184,6 +199,7 @@ async def _single_completion(
     max_tokens: int,
     seed: int | None,
 ) -> str:
+    """Run one text-completion request for prompt-formatted input."""
     extra = {"seed": seed} if seed is not None else {}
     response = await async_client.completions.create(
         model=model_name,
@@ -477,6 +493,7 @@ async def process_chunk_with_semaphore(
     temp: float,
     seed: int,
 ) -> tuple[list[tuple[str, dict]], int]:
+    """Run chunk processing under concurrency control with fail-safe fallback."""
     async with semaphore:
         try:
             return await process_chunk(
@@ -496,7 +513,7 @@ async def process_chunk_with_semaphore(
 
 
 def make_run_key(question_id: int, judge_type: str, prompt_variant: str, temperature: float, repeat_id: int) -> str:
-    # One logical experiment row per key. SINGLE_ANSWER keeps A/B in the same row.
+    """Build deterministic dedup key for resume-safe incremental writes."""
     return f"{question_id}|{judge_type}|{prompt_variant}|{temperature}|{repeat_id}"
 
 
@@ -574,6 +591,7 @@ print(f"Resume state: {len(processed)} / {expected_total} already completed")
 # Main batch loop
 # -----------------------------------------------------------------------------
 async def run_batches() -> None:
+    """Execute the full async batch pipeline and stream rows to JSONL."""
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_BATCHES)
 
     with OUTPUT_JSONL.open("a", encoding="utf-8") as f:

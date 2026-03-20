@@ -17,6 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 def _load_csv_safe(path: Path) -> pd.DataFrame | None:
+    """Load a CSV file if present, otherwise return None.
+
+    Plot functions use this helper to stay resilient when some intermediate
+    artifacts are intentionally absent (for example, partial reruns).
+    """
     if path.exists():
         return pd.read_csv(path)
     return None
@@ -264,7 +269,7 @@ def plot_score_distribution(output_dir: Path):
 
 
 def generate_all_plots(output_dir: Path | str):
-    """Generate all visualization plots."""
+    """Generate all visualization plots and continue on per-plot failures."""
     output_dir = Path(output_dir)
 
     plot_funcs = [

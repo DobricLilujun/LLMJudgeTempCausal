@@ -1,4 +1,7 @@
 .env
 output/
+notebook/
+*.ipynb
+*.egg-info/
 src/llmjudgetempcausal/assets/*json
 src/llmjudgetempcausal/assets/*jsonl

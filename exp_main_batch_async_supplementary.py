@@ -1,3 +1,14 @@
+"""Asynchronous supplementary-bias experiment runner.
+
+This script extends the base async evaluator with controlled interventions for:
+- position bias,
+- verbosity bias,
+- human-alignment framing bias.
+
+Each condition is encoded into the run key so outputs are resumable and
+stratifiable in downstream analysis.
+"""
+
 import asyncio
 import json
 import logging
@@ -83,15 +94,18 @@ def _messages_to_prompt(messages: list[dict[str, str]]) -> str:
 
 
 def _chunks(items: list, size: int):
+    """Yield fixed-size chunks from a list."""
     for i in range(0, len(items), size):
         yield items[i:i + size]
 
 
 def _clone_turns(turns: list[dict]) -> list[dict]:
+    """Copy conversation turn dictionaries so transformations stay side-effect free."""
     return [dict(turn) for turn in turns]
 
 
 def _stretch_text(text: str, factor: int) -> str:
+    """Amplify verbosity by repeating text blocks with blank-line separators."""
     if factor <= 1:
         return text
     return "\n\n".join([text] * factor)
@@ -103,6 +117,7 @@ def _make_transformed_pair(
     response_b_multiplier: int = 1,
     reference_expert_emphasis: bool = False,
 ) -> JudgePair:
+    """Create a transformed pair for supplementary bias conditions."""
     conversation_a = _clone_turns(pair.conversation_a)
     conversation_b = _clone_turns(pair.conversation_b)
 
@@ -141,6 +156,7 @@ async def _single_completion(
     max_tokens: int,
     seed: int | None,
 ) -> str:
+    """Run one completion request for a serialized prompt."""
     extra = {"seed": seed} if seed is not None else {}
     response = await async_client.completions.create(
         model=model_name,
@@ -238,12 +254,14 @@ async def batch_generate_prompts(
 
 
 def _normalize_swapped_winner(raw_winner: str | None, swapped: bool) -> str | None:
+    """Map winner back to canonical A/B orientation for swapped prompts."""
     if not swapped or raw_winner not in ("A", "B"):
         return raw_winner
     return "B" if raw_winner == "A" else "A"
 
 
 def build_supplementary_conditions() -> list[dict]:
+    """Enumerate all supplementary experimental conditions."""
     conditions = []
     prompt_variants = [PromptVariant.BASELINE, PromptVariant.COT]
 
@@ -492,6 +510,7 @@ async def process_chunk_with_semaphore(
     temp: float,
     seed: int,
 ) -> tuple[list[tuple[str, dict]], int]:
+    """Guard chunk execution with semaphore and convert hard failures to row errors."""
     async with semaphore:
         try:
             return await process_chunk(
@@ -518,6 +537,7 @@ def make_run_key(
     temperature: float,
     repeat_id: int,
 ) -> str:
+    """Build deterministic key that uniquely identifies each supplementary run row."""
     return (
         f"{question_id}|{supplementary_experiment}|{supplementary_variant}|"
         f"{judge_type}|{prompt_variant}|{temperature}|{repeat_id}"
@@ -601,6 +621,7 @@ print(f"Resume state: {len(processed)} / {expected_total} already completed")
 # Main supplementary loop
 # -----------------------------------------------------------------------------
 async def run_supplementary_batches() -> None:
+    """Execute all supplementary conditions and stream outputs to JSONL."""
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_BATCHES)
 
     with OUTPUT_JSONL.open("a", encoding="utf-8") as f:

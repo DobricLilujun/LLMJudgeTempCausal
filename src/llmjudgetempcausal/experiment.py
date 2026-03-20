@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import time
-from dataclasses import asdict
 from pathlib import Path
 
 import pandas as pd
@@ -27,14 +24,15 @@ from .config import (
     ModelConfig,
     PromptVariant,
 )
-from .data import JudgePair, load_mt_bench_human, sample_pairs
+from .data import load_mt_bench_human, sample_pairs
 from .judge import JudgeResult, run_judge_pair_consistency, run_judge_single
-from .metrics import aggregate_metrics_by_group, compute_all_metrics
+from .metrics import aggregate_metrics_by_group
 
 logger = logging.getLogger(__name__)
 
 
 def _result_to_dict(r: JudgeResult) -> dict:
+    """Serialize JudgeResult into a flat row for CSV/JSON outputs."""
     return {
         "question_id": r.question_id,
         "model_a": r.model_a,
@@ -97,6 +95,7 @@ class ExperimentRunner:
             * self.config.num_repeats
         )
 
+        # Progress bar tracks total judged pair evaluations across all configs.
         pbar = tqdm(total=total_configs * len(self.pairs), desc="Judging")
 
         for mc, client in self.clients:
@@ -131,6 +130,7 @@ class ExperimentRunner:
         pbar,
     ):
         """Run one configuration across all pairs."""
+        # Each configuration sweeps the current sampled pair list once.
         for pair in self.pairs:
             try:
                 results = run_judge_single(

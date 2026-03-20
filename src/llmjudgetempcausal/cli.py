@@ -19,6 +19,7 @@ from .experiment import ExperimentRunner
 
 
 def setup_logging(verbose: bool = False):
+    """Configure process-wide logging with a consistent timestamp format."""
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
         level=level,
@@ -74,7 +75,8 @@ def run(
         click.echo("Error: --model and --base-url must have the same count", err=True)
         sys.exit(1)
 
-    # Build model configs
+    # Build model configs. For convenience, singleton optional arguments are
+    # padded to match the number of provided models.
     if not api_key:
         api_key = tuple("EMPTY" for _ in model)
     if not backend:

@@ -8,18 +8,24 @@ from typing import Optional
 
 
 class BackendType(str, Enum):
+    """Supported model serving backends."""
+
     VLLM = "vllm"
     SGLANG = "sglang"
     OPENAI = "openai"
 
 
 class JudgeType(str, Enum):
+    """Supported judge task modes."""
+
     PAIRWISE = "pairwise"
     SINGLE_ANSWER = "single_answer"
     REFERENCE_GUIDED = "reference_guided"
 
 
 class PromptVariant(str, Enum):
+    """Prompt-engineering variants used in ablation and causal analyses."""
+
     BASELINE = "baseline"
     POSITION_SWAP = "position_swap"
     FEW_SHOT = "few_shot"
@@ -38,6 +44,7 @@ class ModelConfig:
     model_size_label: str = ""  # e.g., "1B", "7B", "70B"
 
     def __post_init__(self):
+        """Infer a readable model label from model name when omitted."""
         if not self.model_size_label:
             self.model_size_label = self.model_name.split("/")[-1]
 
