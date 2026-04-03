@@ -398,20 +398,8 @@ Recommended workflow:
    - reproducible command,
    - and before/after artifacts when relevant.
 
-## 16. Citation
 
-If you use this project in academic work, please cite:
-
-~~~bibtex
-@software{llmjudgetempcausal,
-  title  = {LLMJudgeTempCausal: Causal Analysis of Temperature Effects in LLM-as-a-Judge},
-  author = {LLMJudgeTempCausal Contributors},
-  year   = {2026},
-  url    = {https://github.com/<your-org>/LLMJudgeTempCausal}
-}
-~~~
-
-## 17. License
+## 16. License
 
 No root LICENSE file is currently committed in this repository.
 
