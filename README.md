@@ -62,18 +62,6 @@ uv run llmjudge run \
     -o results
 ~~~
 
-4) Rebuild metrics and plots.
-
-~~~bash
-uv run llmjudge analyze -d results
-~~~
-
-5) Export graph figure.
-
-~~~bash
-uv run llmjudge dag -o results/dag.png
-~~~
-
 ## Code Structure
 
 ~~~text
@@ -103,3 +91,23 @@ src/
 - `config.py`: shared configuration, enums, and dataclasses.
 - `causal.py`: graph export and related analysis utilities.
 - `assets/`: bundled prompts, datasets, and intermediate resources.
+
+
+## Easy words to summarize
+
+It’s important to note that these experiments were designed primarily to examine **how temperature affects LLMs used as judges** and whether adjusting temperature can improve their performance.
+
+One of the common findings is that **lower temperature makes judge LLMs much more consistent** in their outputs. However, this benefit comes with a trade-off: the model tends to behave more like a **rigid answer generator** than a thoughtful, human-like judge.
+
+By contrast, **higher temperature increases the risk of hallucination** when the LLM follows instructions. Even so, high temperature is **not purely harmful**. Most LLMs still produce judgments that are largely usable and valid, even under higher settings.
+
+A closer look at individual test cases shows that **high-temperature judges reason through problems more thoroughly** and behave in a way that is so called **closer to human judgment**.
+
+Based on these findings, we propose **Ensemble Thermo Judge**. This method runs the LLM multiple times under **high-temperature settings** and allows different outputs to **vote on the final decision**. As a result, judgment accuracy improves by **2% to 5%**.
+
+This improvement demonstrates that **high temperature can offer clear advantages** and supports the idea that judges at higher settings consider **more details** before making decisions.
+
+In practical terms, the recommendation is straightforward:
+- If computing resources are limited, use **low temperature** for more **consistent** and **reproducible** results.
+- If the goal is to obtain more **balanced and comprehensive judgments**, use **high temperature**, combine it with **Chain-of-Thought (CoT) reasoning**, and run **multiple rounds of judgment queries**.
+- Don't use small language models as a judge when you set high temperature.
