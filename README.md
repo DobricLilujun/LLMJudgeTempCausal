@@ -6,7 +6,7 @@ This is the double-blind anonymous repository for the paper **"The Necessity of 
 
 Using large language models (LLMs) as judges to evaluate model outputs has become an important paradigm for automated evaluation. However, in LLM-as-a-Judge settings, the decoding temperature is still typically chosen empirically, with limited systematic evidence regarding its impact. To address this gap, this work presents a systematic study of how temperature influences judgment behavior across different LLM judge models, prompting strategies, and evaluation paradigms. The results show that higher temperatures generally reduce judgment consistency and increase formatting errors, while also revealing latent uncertainty that is often suppressed under low-temperature decoding, especially in ambiguous cases. Further analysis suggests that higher temperatures can serve as an exploratory mechanism and may improve judging performance in complex or uncertain evaluation scenarios. Overall, low-temperature settings are better suited to tasks that prioritize stability and reproducibility, whereas higher-temperature settings are more appropriate for scenarios with substantial ambiguity or complexity, where exploring the judge's decision space is beneficial. These findings suggest that, in LLM-as-a-Judge systems, temperature should be treated not as a fixed hyperparameter but as a controllable, task-dependent design choice that mediates the trade-off between reliability and exploration.
 
-![Logo](temperature_LLM_Judge.png)
+![Logo](./temperature_LLM_Judge.png)
 
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
