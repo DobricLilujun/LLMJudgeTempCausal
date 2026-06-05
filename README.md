@@ -10,7 +10,6 @@ Using large language models (LLMs) as judges to evaluate model outputs has becom
 
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![Hugging Face Profile](https://img.shields.io/badge/HuggingFace-Volavion-yellow?logo=huggingface)](https://huggingface.co/Volavion)
 [![Hugging Face Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow?logo=huggingface)](https://huggingface.co/datasets/Volavion/eval_temperatures_bench)
 
 Lightweight framework for testing how decoding temperature changes LLM-as-a-Judge behavior.
