@@ -1,0 +1,27 @@
+You are labeling whether a model-comparison question is intrinsically ambiguous.
+
+Context:
+- human_winner label (for context only): {{ human_winner }}
+- Candidate Answer A:
+{{ answer_a }}
+- Candidate Answer B:
+{{ answer_b }}
+- Reference (if available):
+{{ reference_answer }}
+
+Task: decide one label from:
+1) ambiguous
+2) non_ambiguous
+3) unsure
+
+Definition guidelines:
+- ambiguous: both answers are reasonably defensible or preference is materially underdetermined.
+- non_ambiguous: one answer is clearly superior under standard quality criteria (correctness, completeness, faithfulness, clarity).
+- unsure: insufficient information or severe noise.
+
+Return STRICT JSON only with this schema:
+{
+  "label": "ambiguous|non_ambiguous|unsure",
+  "confidence": <float between 0 and 1>,
+  "rationale": "<one short sentence>"
+}
