@@ -1,0 +1,281 @@
+% Use this file for citations not found in the ACL Anthology (contained in "anthology.bib").
+
+@inproceedings{10.5555/3666122.3668142,
+author = {Zheng, Lianmin and Chiang, Wei-Lin and Sheng, Ying and Zhuang, Siyuan and Wu, Zhanghao and Zhuang, Yonghao and Lin, Zi and Li, Zhuohan and Li, Dacheng and Xing, Eric P. and Zhang, Hao and Gonzalez, Joseph E. and Stoica, Ion},
+title = {Judging LLM-as-a-judge with MT-bench and Chatbot Arena},
+year = {2023},
+publisher = {Curran Associates Inc.},
+address = {Red Hook, NY, USA},
+abstract = {Evaluating large language model (LLM) based chat assistants is challenging due to their broad capabilities and the inadequacy of existing benchmarks in measuring human preferences. To address this, we explore using strong LLMs as judges to evaluate these models on more open-ended questions. We examine the usage and limitations of LLM-as-a-judge, including position, verbosity, and self-enhancement biases, as well as limited reasoning ability, and propose solutions to mitigate some of them. We then verify the agreement between LLM judges and human preferences by introducing two benchmarks: MT-bench, a multi-turn question set; and Chatbot Arena, a crowdsourced battle platform. Our results reveal that strong LLM judges like GPT-4 can match both controlled and crowdsourced human preferences well, achieving over 80\% agreement, the same level of agreement between humans. Hence, LLM-as-a-judge is a scalable and explainable way to approximate human preferences, which are otherwise very expensive to obtain. Additionally, we show our benchmark and traditional benchmarks complement each other by evaluating several variants of LLaMA and Vicuna. The MT-bench questions, 3K expert votes, and 30K conversations with human preferences are publicly available at https://github.com/lm-sys/FastChat/tree/main/fastchat/llm_judge.},
+booktitle = {Proceedings of the 37th International Conference on Neural Information Processing Systems},
+articleno = {2020},
+numpages = {29},
+location = {New Orleans, LA, USA},
+series = {NIPS '23}
+}
+
+@article{GU2026101253,
+title = {A survey on LLM-as-a-Judge},
+journal = {The Innovation},
+pages = {101253},
+year = {2026},
+issn = {2666-6758},
+doi = {https://doi.org/10.1016/j.xinn.2025.101253},
+url = {https://www.sciencedirect.com/science/article/pii/S2666675825004564},
+author = {Jiawei Gu and Xuhui Jiang and Zhichao Shi and Hexiang Tan and Xuehao Zhai and Chengjin Xu and Wei Li and Yinghan Shen and Shengjie Ma and Honghao Liu and Saizhuo Wang and Kun Zhang and Zhouchi Lin and Bowen Zhang and Lionel Ni and Wen Gao and Yuanzhuo Wang and Jian Guo},
+abstract = {Accurate and consistent evaluation is crucial for decision-making across numerous fields, yet it remains challenging due to inherent subjectivity, variability, and scale. Large Language Models (LLMs) have achieved remarkable success, leading to ”LLM-as-a-Judge,” where LLMs serve as evaluators for complex tasks. With their ability to process diverse data types and provide scalable assessments, LLMs present a compelling alternative to traditional expert-driven evaluations. However, ensuring the reliability of LLM-as-a-Judge systems remains a significant challenge requiring careful design and standardization. This paper provides a comprehensive survey on LLM-as-a-Judge, offering a formal definition and detailed classification, while addressing the core question: How to build reliable LLM-as-a-Judge systems? We explore strategies to enhance reliability, including improving consistency, mitigating biases, and adapting to diverse scenarios. We propose methodologies for evaluating reliability, supported by a novel benchmark. To advance development and deployment, we discuss practical applications, challenges, and future directions. Our contributions span multiple levels: we establish conceptual boundaries, reorganize fragmented literature into a unified framework, and propose a reliability-oriented benchmark. We articulate a forward-looking research agenda, offering theoretical foundations and practical guidance for constructing reliable and trustworthy LLM-as-a-Judge systems. Resources are available at https://awesome-llm-as-a-judge.github.io/. Large Language Models, LLM-as-a-Judge, Automated Evaluation, Reliability Assessment, Trustworthy AI 12}
+}
+
+
+@inproceedings{shi-etal-2025-judging,
+    title = "Judging the Judges: A Systematic Study of Position Bias in {LLM}-as-a-Judge",
+    author = "Shi, Lin  and
+      Ma, Chiyu  and
+      Liang, Wenhua  and
+      Diao, Xingjian  and
+      Ma, Weicheng  and
+      Vosoughi, Soroush",
+    editor = "Inui, Kentaro  and
+      Sakti, Sakriani  and
+      Wang, Haofen  and
+      Wong, Derek F.  and
+      Bhattacharyya, Pushpak  and
+      Banerjee, Biplab  and
+      Ekbal, Asif  and
+      Chakraborty, Tanmoy  and
+      Singh, Dhirendra Pratap",
+    booktitle = "Proceedings of the 14th International Joint Conference on Natural Language Processing and the 4th Conference of the Asia-Pacific Chapter of the Association for Computational Linguistics",
+    month = dec,
+    year = "2025",
+    address = "Mumbai, India",
+    publisher = "The Asian Federation of Natural Language Processing and The Association for Computational Linguistics",
+    url = "https://aclanthology.org/2025.ijcnlp-long.18/",
+    pages = "292--314",
+    ISBN = "979-8-89176-298-5",
+    abstract = "LLM-as-a-Judge has emerged as a promising alternative to human evaluators across various tasks, yet inherent biases{---}particularly position bias, the tendency to favor solutions based on their position within the prompt{---}compromise its reliability. This exploratory study evaluates position bias in LLM judges across pairwise and list-wise comparison settings, introducing three metrics: repetition stability, position consistency, and preference fairness. Our experiments, involving 15 LLM judges across MTBench and DevBench with 22 tasks and approximately 40 solution-generating models, result in over 150,000 evaluation instances. We identify Judge-Level, Candidate-Level, and Task-Level factors contributing to bias. The findings confirm that position bias is not due to random chance and varies significantly across judges and tasks. While position bias is weakly influenced by the length of prompt components, it is strongly affected by the quality gap between solutions. Our agreement and disagreement analysis among judges further provides insights into the distribution of judging difficulty across the dataset, and highlights the potential for dataset modifications."
+}
+
+
+@misc{wei2025systematicevaluationllmasajudgellm,
+      title={Systematic Evaluation of LLM-as-a-Judge in LLM Alignment Tasks: Explainable Metrics and Diverse Prompt Templates}, 
+      author={Hui Wei and Shenghua He and Tian Xia and Fei Liu and Andy Wong and Jingyang Lin and Mei Han},
+      year={2025},
+      eprint={2408.13006},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2408.13006}, 
+}
+
+@article{LI2025242,
+title = {Exploring the Impact of Temperature on Large Language Models: Hot or Cold?},
+journal = {Procedia Computer Science},
+volume = {264},
+pages = {242-251},
+year = {2025},
+note = {International Neural Network Society Workshop on Deep Learning Innovations and Applications 2025},
+issn = {1877-0509},
+doi = {https://doi.org/10.1016/j.procs.2025.07.135},
+url = {https://www.sciencedirect.com/science/article/pii/S1877050925021854},
+author = {Lujun Li and Lama Sleem and Niccolo’ Gentile and Geoffrey Nichil and Radu State},
+keywords = {Large Language Models, Sampling Temperature, Model Performance Evaluation, BERT-based Classifier, GPT-based Evaluation},
+abstract = {The sampling temperature, a critical hyperparameter in large language models (LLMs), modifies the logits before the softmax layer, thereby reshaping the distribution of output tokens. Recent studies have challenged the “Stochastic Parrots” analogy by demonstrating that LLMs are capable of understanding semantics rather than merely memorizing data and that randomness, modulated by sampling temperature, plays a crucial role in model inference. In this study, we systematically evaluated the impact of temperature in the range of 0 to 2 on data sets designed to assess six different capabilities, conducting statistical analyses on open source models of three different sizes: small (1B–4B), medium (6B–13B), and large (40B–80B). Our findings reveal distinct skill-specific effects of temperature on model performance, highlighting the complexity of optimal temperature selection in practical applications. To address this challenge, we propose a BERT-based temperature selector that takes advantage of these observed effects to identify the optimal temperature for a given prompt. We demonstrate that this approach can significantly improve the performance of small and medium models in the SuperGLUE datasets. Furthermore, our study extends to FP16 precision inference, revealing that temperature effects are consistent with those observed in 4-bit quantized models. By evaluating temperature effects up to 4.0 in three quantized models, we find that the “Mutation Temperature”—the point at which significant performance changes occur—increases with model size1.}
+}
+
+
+@inproceedings{10.5555/3737916.3740934,
+author = {Wang, Yubo and Ma, Xueguang and Zhang, Ge and Ni, Yuansheng and Chandra, Abhranil and Guo, Shiguang and Ren, Weiming and Arulraj, Aaran and He, Xuan and Jiang, Ziyan and Li, Tianle and Ku, Max and Wang, Kai and Zhuang, Alex and Fan, Rongqi and Yue, Xiang and Chen, Wenhu},
+title = {MMLU-Pro: a more robust and challenging multi-task language understanding benchmark},
+year = {2024},
+isbn = {9798331314385},
+publisher = {Curran Associates Inc.},
+address = {Red Hook, NY, USA},
+abstract = {In the age of large-scale language models, benchmarks like the Massive Multitask Language Understanding (MMLU) have been pivotal in pushing the boundaries of what AI can achieve in language comprehension and reasoning across diverse domains. However, as models continue to improve, their performance on these benchmarks has begun to plateau, making it increasingly difficult to discern differences in model capabilities. This paper introduces MMLU-Pro, an enhanced dataset designed to extend the mostly knowledge-driven MMLU benchmark by integrating more challenging, reasoning-focused questions and expanding the choice set from four to ten options. Additionally, MMLU-Pro eliminates the trivial and noisy questions in MMLU. Our experimental results show that MMLU-Pro not only raises the challenge, causing a significant drop in accuracy by 16\% to 33\% compared to MMLU but also demonstrates greater stability under varying prompts. With 24 different prompt styles tested, the sensitivity of model scores to prompt variations decreased from 4-5\% in MMLU to just 2\% in MMLU-Pro. Additionally, we found that models utilizing Chain of Thought (CoT) reasoning achieved better performance on MMLU-Pro compared to direct answering, which is in stark contrast to the findings on the original MMLU, indicating that MMLU-Pro includes more complex reasoning questions. Our assessments confirm that MMLU-Pro is a more discriminative benchmark to better track progress in the field.},
+booktitle = {Proceedings of the 38th International Conference on Neural Information Processing Systems},
+articleno = {3018},
+numpages = {25},
+location = {Vancouver, BC, Canada},
+series = {NIPS '24}
+}
+
+
+@misc{qwen3technicalreport,
+      title={Qwen3 Technical Report}, 
+      author={Qwen Team},
+      year={2025},
+      eprint={2505.09388},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2505.09388}, 
+}
+
+@article{qwen2.5-1m,
+      title={Qwen2.5-1M Technical Report}, 
+      author={An Yang and Bowen Yu and Chengyuan Li and Dayiheng Liu and Fei Huang and Haoyan Huang and Jiandong Jiang and Jianhong Tu and Jianwei Zhang and Jingren Zhou and Junyang Lin and Kai Dang and Kexin Yang and Le Yu and Mei Li and Minmin Sun and Qin Zhu and Rui Men and Tao He and Weijia Xu and Wenbiao Yin and Wenyuan Yu and Xiafei Qiu and Xingzhang Ren and Xinlong Yang and Yong Li and Zhiying Xu and Zipeng Zhang},
+      journal={arXiv preprint arXiv:2501.15383},
+      year={2025}
+}
+
+@article{gemma_2025,
+    title={Gemma 3},
+    url={https://goo.gle/Gemma3Report},
+    publisher={Kaggle},
+    author={Gemma Team},
+    year={2025},
+    journal={Huggingface},
+}
+
+
+@inproceedings{renze-2024-effect,
+    title = "The Effect of Sampling Temperature on Problem Solving in Large Language Models",
+    author = "Renze, Matthew",
+    editor = "Al-Onaizan, Yaser  and
+      Bansal, Mohit  and
+      Chen, Yun-Nung",
+    booktitle = "Findings of the Association for Computational Linguistics: EMNLP 2024",
+    month = nov,
+    year = "2024",
+    address = "Miami, Florida, USA",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2024.findings-emnlp.432/",
+    doi = "10.18653/v1/2024.findings-emnlp.432",
+    pages = "7346--7356",
+    abstract = "In this research study, we empirically investigate the effect of sampling temperature on the performance of Large Language Models (LLMs) on various problem-solving tasks. We created a multiple-choice question-and-answer (MCQA) exam by randomly sampling problems from standard LLM benchmarks. Then, we used nine popular LLMs with five prompt-engineering techniques to solve the MCQA problems while increasing the sampling temperature from 0.0 to 1.6. Despite anecdotal reports to the contrary, our empirical results indicate that changes in temperature from 0.0 to 1.0 do not have a statistically significant impact on LLM performance for problem-solving tasks. In addition, these results appear to generalize across LLMs, prompt-engineering techniques, and problem domains. All code, data, and supplemental materials are available on GitHub at: https://github.com/matthewrenze/jhu-llm-temperature"
+}
+
+
+@article{ACKLEY1985147,
+title = {A learning algorithm for boltzmann machines},
+journal = {Cognitive Science},
+volume = {9},
+number = {1},
+pages = {147-169},
+year = {1985},
+issn = {0364-0213},
+doi = {https://doi.org/10.1016/S0364-0213(85)80012-4},
+url = {https://www.sciencedirect.com/science/article/pii/S0364021385800124},
+author = {David H. Ackley and Geoffrey E. Hinton and Terrence J. Sejnowski},
+abstract = {The computational power of massively parallel networks of simple processing elements resides in the communication bandwidth provided by the hardware connections between elements. These connections can allow a significant fraction of the knowledge of the system to be applied to an instance of a problem in a very short time. One kind of computation for which massively parallel networks appear to be well suited is large constraint satisfaction searches, but to use the connections efficiently two conditions must be met: First, a search technique that is suitable for parallel networks must be found. Second, there must be some way of choosing internal representations which allow the preexisting hardware connections to be used efficiently for encoding the constraints in the domain being searched. We describe a general parallel search method, based on statistical mechanics, and we show how it leads to a general learning rule for modifying the connection strengths so as to incorporate knowledge about a task domain in an efficient way. We describe some simple examples in which the learning algorithm creates internal representations that are demonstrably the most efficient way of using the preexisting connectivity structure.}
+}
+
+@misc{deepseek_api_temp_2026,
+  title = {The Temperature Parameter},
+  author = {DeepSeek},
+  year = {2026},
+  journal = {DeepSeek API Documentation},
+  howpublished = {\url{https://api-docs.deepseek.com/quick_start/parameter_settings}},
+  note = {Accessed: March 17, 2026}
+}
+
+
+@misc{peeperkorn2024temperaturecreativityparameterlarge,
+      title={Is Temperature the Creativity Parameter of Large Language Models?}, 
+      author={Max Peeperkorn and Tom Kouwenhoven and Dan Brown and Anna Jordanous},
+      year={2024},
+      eprint={2405.00492},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2405.00492}, 
+}
+
+
+
+@misc{ye2024justiceprejudicequantifyingbiases,
+      title={Justice or Prejudice? Quantifying Biases in LLM-as-a-Judge}, 
+      author={Jiayi Ye and Yanbo Wang and Yue Huang and Dongping Chen and Qihui Zhang and Nuno Moniz and Tian Gao and Werner Geyer and Chao Huang and Pin-Yu Chen and Nitesh V Chawla and Xiangliang Zhang},
+      year={2024},
+      eprint={2410.02736},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2410.02736}, 
+}
+
+@inproceedings{chen-etal-2024-humans,
+    title = "Humans or {LLM}s as the Judge? A Study on Judgement Bias",
+    author = "Chen, Guiming Hardy  and
+      Chen, Shunian  and
+      Liu, Ziche  and
+      Jiang, Feng  and
+      Wang, Benyou",
+    editor = "Al-Onaizan, Yaser  and
+      Bansal, Mohit  and
+      Chen, Yun-Nung",
+    booktitle = "Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing",
+    month = nov,
+    year = "2024",
+    address = "Miami, Florida, USA",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2024.emnlp-main.474/",
+    doi = "10.18653/v1/2024.emnlp-main.474",
+    pages = "8301--8327",
+    abstract = "Adopting human and large language models (LLM) as judges (*a.k.a* human- and LLM-as-a-judge) for evaluating the performance of LLMs has recently gained attention. Nonetheless, this approach concurrently introduces potential biases from human and LLMs, questioning the reliability of the evaluation results. In this paper, we propose a novel framework that is free from referencing groundtruth annotations for investigating **Misinformation Oversight Bias**, **Gender Bias**, **Authority Bias** and **Beauty Bias** on LLM and human judges. We curate a dataset referring to the revised Bloom{'}s Taxonomy and conduct thousands of evaluations. Results show that human and LLM judges are vulnerable to perturbations to various degrees, and that even the cutting-edge judges possess considerable biases. We further exploit these biases to conduct attacks on LLM judges. We hope that our work can notify the community of the bias and vulnerability of human- and LLM-as-a-judge, as well as the urgency of developing robust evaluation systems."
+}
+
+@misc{chernozhukov2024doubledebiasedmachinelearningtreatment,
+      title={Double/Debiased Machine Learning for Treatment and Causal Parameters}, 
+      author={Victor Chernozhukov and Denis Chetverikov and Mert Demirer and Esther Duflo and Christian Hansen and Whitney Newey and James Robins},
+      year={2024},
+      eprint={1608.00060},
+      archivePrefix={arXiv},
+      primaryClass={stat.ML},
+      url={https://arxiv.org/abs/1608.00060}, 
+}
+
+@misc{gu2025surveyllmasajudge,
+      title={A Survey on LLM-as-a-Judge}, 
+      author={Jiawei Gu and Xuhui Jiang and Zhichao Shi and Hexiang Tan and Xuehao Zhai and Chengjin Xu and Wei Li and Yinghan Shen and Shengjie Ma and Honghao Liu and Saizhuo Wang and Kun Zhang and Yuanzhuo Wang and Wen Gao and Lionel Ni and Jian Guo},
+      year={2025},
+      eprint={2411.15594},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2411.15594}, 
+}
+
+
+@misc{du2025optimizingtemperaturelanguagemodels,
+      title={Optimizing Temperature for Language Models with Multi-Sample Inference}, 
+      author={Weihua Du and Yiming Yang and Sean Welleck},
+      year={2025},
+      eprint={2502.05234},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abmts/2502.05234}, 
+}
+
+
+@misc{zhang2026markovcategoricalframeworklanguage,
+      title={A Markov Categorical Framework for Language Modeling}, 
+      author={Yifan Zhang},
+      year={2026},
+      eprint={2507.19247},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2507.19247}, 
+}
+
+@article{tang2025learning,
+  title={Learning an Efficient Multi-Turn Dialogue Evaluator from Multiple LLM Judges},
+  author={Tang, Yuqi and Feng, Kehua and Wang, Yunfeng and Chen, Zhiwen and Lv, Chengfei and Yu, Gang and Zhang, Qiang and Ding, Keyan and Chen, Huajun},
+  journal={arXiv preprint arXiv:2508.00454},
+  year={2025}
+}
+
+
+@article{DBLP:journals/corr/abs-2201-11903,
+  author       = {Jason Wei and
+                  Xuezhi Wang and
+                  Dale Schuurmans and
+                  Maarten Bosma and
+                  Ed H. Chi and
+                  Quoc Le and
+                  Denny Zhou},
+  title        = {Chain of Thought Prompting Elicits Reasoning in Large Language Models},
+  journal      = {CoRR},
+  volume       = {abs/2201.11903},
+  year         = {2022},
+  url          = {https://arxiv.org/abs/2201.11903},
+  eprinttype   = {arXiv},
+  eprint       = {2201.11903},
+  timestamp    = {Fri, 22 Apr 2022 16:06:31 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-2201-11903.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
+}
